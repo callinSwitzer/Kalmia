@@ -2,6 +2,7 @@
 # 9 Nov 2016
 ## Analyze the behavior of pollinators
 ## from videos that I manually classified
+## added to github
 
 set.seed(12345)
 ipak <- function(pkg){

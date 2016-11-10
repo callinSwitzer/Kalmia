@@ -5,6 +5,7 @@
 ## added to github
 
 
+# set seed so every run is the same
 set.seed(12345)
 ipak <- function(pkg){
      new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
@@ -309,8 +310,8 @@ propTab4
 
 propTab4$leg <- factor(propTab4$leg, levels = c('unknown', 'front leg', 'mid leg'))
 
-### HERE
 
+# figure 4
 ggplot(propTab4, aes(x = leg, y = mean)) + 
      #geom_point(size = 1, color= 'grey40') + 
      geom_pointrange(aes(ymax = upper, ymin=lower), size = 0.2) + 

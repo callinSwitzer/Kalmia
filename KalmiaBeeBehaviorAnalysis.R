@@ -21,6 +21,7 @@ theme_set(theme_classic())
 
 
 # gsheet called Kalmia Bee Behavior classification
+# viewable link
 URL = 'https://docs.google.com/spreadsheets/d/1gxAmCcwJ9zsnYxjXe2hnTowPUxTjadbBx-eXJYS4_Js/edit?usp=sharing'
 
 beh = gsheet2tbl(URL)

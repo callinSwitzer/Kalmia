@@ -64,6 +64,11 @@ t1 <- table(beh_field[beh_field$pollinatorClass == "Bombus spp." &
 t1
 
 prop.table(t1)
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 61acef99c4ac78c7e2aa539032ab3fab49aec6b8
 ```
 
 

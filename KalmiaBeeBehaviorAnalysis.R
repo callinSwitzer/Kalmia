@@ -24,9 +24,10 @@ theme_set(theme_classic())
 # viewable link
 URL = 'https://docs.google.com/spreadsheets/d/1gxAmCcwJ9zsnYxjXe2hnTowPUxTjadbBx-eXJYS4_Js/edit?usp=sharing'
 
+# import data
 beh = gsheet2tbl(URL)
 
-# discard some messed up data (labeled as discard)
+# discard some messed up data (labeled as discard in the dataset)
 discRows = grep(pattern = 'discard', 
                 x = tolower(apply(beh, 
                          MARGIN = 1, 

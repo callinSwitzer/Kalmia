@@ -57,6 +57,18 @@ beh_field <-beh[beh$vid.type == 'field',]
 ```
 
 
+```{r}
+#calculate how often we observed pollen flying past the bee from videos
+t1 <- table(beh_field[beh_field$pollinatorClass == "Bombus spp." & 
+                     !(is.na(beh_field$timeTrig1)), ]$SeePollenFlyPastBee)
+t1
+
+prop.table(t1)
+
+
+```
+
+
 ### visualize diversity of pollinators
 ```{r}
 # colnames(beh_field)

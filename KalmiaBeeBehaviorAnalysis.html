@@ -180,6 +180,17 @@ beh = beh[-discRows, ]
 
 # remove lab views with captive bees
 beh_field &lt;-beh[beh$vid.type == 'field',]</code></pre>
+<pre class="r"><code>#calculate how often we observed pollen flying past the bee from videos
+t1 &lt;- table(beh_field[beh_field$pollinatorClass == &quot;Bombus spp.&quot; &amp; 
+                     !(is.na(beh_field$timeTrig1)), ]$SeePollenFlyPastBee)
+t1</code></pre>
+<pre><code>## 
+##  no yes 
+##   9  13</code></pre>
+<pre class="r"><code>prop.table(t1)</code></pre>
+<pre><code>## 
+##        no       yes 
+## 0.4090909 0.5909091</code></pre>
 <div id="visualize-diversity-of-pollinators" class="section level3">
 <h3>visualize diversity of pollinators</h3>
 <pre class="r"><code># colnames(beh_field)
@@ -353,7 +364,7 @@ system.time({
      beh_rep &lt;- t(replicate(n = 10000, behResamp()))
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##  34.504   0.127  34.745</code></pre>
+##  32.904   0.074  33.022</code></pre>
 <pre class="r"><code>colMeans(as.matrix(beh_rep))</code></pre>
 <pre><code>##                      proboscis extended 
 ##                              0.49992268 
@@ -423,7 +434,7 @@ system.time({
      leg_rep &lt;- t(replicate(n = 10000, legResamp()))
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##  29.508   0.082  29.652</code></pre>
+##  29.495   0.130  29.787</code></pre>
 <pre class="r"><code>colMeans(as.matrix(leg_rep))</code></pre>
 <pre><code>## front leg   mid leg   unknown 
 ## 0.2168987 0.1895579 0.5935434</code></pre>

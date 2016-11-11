@@ -14,8 +14,6 @@ output:
 
 
 ### Setup, reading and cleaning data
-
-
 ```{r setup}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 set.seed(123)

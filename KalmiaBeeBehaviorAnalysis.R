@@ -6,7 +6,7 @@
 
 
 # set seed so every run is the same
-set.seed(12345)
+set.seed(123)
 ipak <- function(pkg){
      new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
      if(length(new.pkg)) install.packages(new.pkg, dependencies = TRUE)
@@ -17,7 +17,9 @@ packages <- c("ggplot2", "gsheet", 'lme4', 'plyr', 'nnet', 'viridis')
 ipak(packages)
 
 # set ggplot theme
-theme_set(theme_classic())
+theme_set(theme_classic() + theme(axis.text = element_text(colour = 'black')))
+
+setwd("/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/")
 
 
 # gsheet called Kalmia Bee Behavior classification
@@ -47,10 +49,11 @@ beh_field <- within(beh_field,
                     pollinatorClass <- factor(pollinatorClass, 
                             levels=names(sort(table(pollinatorClass), 
                                               decreasing=TRUE))))
+quartz()
 ggplot(beh_field, aes(x = pollinatorClass)) + 
      geom_bar() + 
      labs (x = "Insect visitor", y = "Frequency") +
-     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1), 
+     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1,colour = 'black'), 
            axis.ticks.x=element_blank()) + 
      scale_x_discrete(labels=c("Bombus spp." = expression(
           paste(italic("Bombus spp."))), 
@@ -78,18 +81,19 @@ propTab <- cbind(propTab, t(apply(reps, MARGIN = 2, quantile, c(0.025, 0.975))))
 propTab
 names(propTab)[3:4] <- c("lower", "upper")
 
-for(ii in 1:6){
-    print(prop.test(table(beh_field$pollinator)[ii], nrow(beh_field)))
-}
+# for(ii in 1:6){
+#     print(prop.test(table(beh_field$pollinator)[ii], nrow(beh_field)))
+# }
 
 nrow(beh_field)
+quartz()
 ggplot(propTab, aes(x = Insect, y = Proportion)) + 
      #geom_bar(stat = 'identity') + 
      geom_point(size = 1, color= 'grey40') + 
      geom_pointrange(aes(ymax = upper, ymin=lower), size = 0.2) + 
      labs (x = "Insect visitor", y = "Proportion of visits") +
      ylim(c(0,1)) + 
-     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1), 
+     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1, colour = 'black'), 
            axis.ticks.x=element_blank()) + 
      scale_x_discrete(labels=c("Bombus spp." = expression(
           paste(italic("Bombus spp."))), 
@@ -120,11 +124,13 @@ propTab2 <- cbind(propTab2, t(apply(reps, MARGIN = 2, quantile, c(0.025, 0.975))
 propTab2
 names(propTab2)[3:4] <- c("lower", "upper")
 
+
+#quartz()
 ggplot(propTab2, aes(x = Insect, y = Proportion)) + 
      geom_point(size = 1, color= 'grey40') + 
      geom_pointrange(aes(ymax = upper, ymin=lower), size = 0.2) + 
      labs (x = "Insect visitor", y = "Proportion of visitors\nthat triggered anthers") +
-     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1), 
+     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1, colour = 'black'), 
            axis.ticks.x=element_blank()) + 
      scale_x_discrete(labels=c("Bombus spp." = expression(
           paste(italic("Bombus spp."))), 
@@ -192,9 +198,11 @@ newDF <- within(newDF,
                                        levels=names(sort(table(Beh2), 
                                                          decreasing=TRUE))))
 colnames(newDF)
+quartz()
 ggplot(newDF, aes(x = trigBehavior)) + 
      geom_bar()
 
+quartz()
 bb <- ggplot(newDF, aes(x = Beh2)) + 
      geom_bar() + 
      labs(x = "Behavior during pollen release") +  
@@ -239,7 +247,7 @@ colnames(propTab3) <- c('mean', "lower", "upper")
 propTab3$Behavior <- rownames(propTab3)
 propTab3
 
-
+quartz()
 ggplot(propTab3, aes(x = Behavior, y = mean)) + 
      #geom_point(size = 1, color= 'grey40') + 
      geom_pointrange(aes(ymax = upper, ymin=lower), size = 0.2) + 
@@ -290,7 +298,7 @@ legResamp <- function(o){
           tmp2 = tmp[tmp$Video == ii , ]
           tmp[tmp$Video == ii , ] =  tmp2[sample(1:nrow(tmp2), replace = TRUE), ]
      }
-     
+     tmp$trL2 <- factor(tmp$trL2, levels = c("front leg", "mid leg","unknown" ), ordered = TRUE)
      pt = prop.table(table(tmp$trL2))
      return(pt)
 }
@@ -300,6 +308,7 @@ legResamp <- function(o){
 system.time({
      leg_rep <- t(replicate(n = 10000, legResamp()))
 })
+
 
 colMeans(as.matrix(leg_rep))
 # get 95% CI's
@@ -314,16 +323,29 @@ propTab4$leg <- factor(propTab4$leg, levels = c('unknown', 'front leg', 'mid leg
 
 
 # figure 4
+quartz()
 ggplot(propTab4, aes(x = leg, y = mean)) + 
      #geom_point(size = 1, color= 'grey40') + 
      geom_pointrange(aes(ymax = upper, ymin=lower), size = 0.2) + 
      labs (x = "Cause of anther release", 
            y = "Proportion of bumblebee causes\nthat triggered anthers") +
-     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1), 
+     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1, colour = 'black'), 
            axis.ticks.x=element_blank()) + 
      ylim(c(0, 0.8))
 ggsave(filename = "KalmiaFigures/LegTrig.pdf", width = 3, height = 4)
 length(unique(newDF$Video))
 nrow(newDF)
 table(newDF$pollinator)
+
+write.table(propTab, '~/Desktop/proportions.csv', row.names = FALSE, sep = ", ")
+write.table("\n",append = TRUE, '~/Desktop/proportions.csv', row.names = FALSE, sep = ", ")
+write.table(propTab2,append = TRUE, '~/Desktop/proportions.csv', row.names = FALSE, sep = ", ")
+write.table("\n",append = TRUE, '~/Desktop/proportions.csv', row.names = FALSE, sep = ", ")
+write.table(propTab3,append = TRUE, '~/Desktop/proportions.csv', row.names = FALSE, sep = ", ")
+write.table("\n",append = TRUE, '~/Desktop/proportions.csv', row.names = FALSE, sep = ", ")
+write.table(propTab4,append = TRUE, '~/Desktop/proportions.csv', row.names = FALSE, sep = ", ")
+
+
+ # close all quartz windows
+graphics.off()
 

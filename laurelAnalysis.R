@@ -62,7 +62,7 @@ for(ii in 1:length(metDat$digitizedFile)){
      smspar <- 0.5
      xsmth <- smooth.spline(anther$x, spar = smspar) 
      ysmth <- smooth.spline(anther$y, spar = smspar)
-     ?smooth.spline
+     #?smooth.spline
      
      lines(xsmth$y, ysmth$y, type = "l", lwd = 3, col = rgb(0, 0, 0, 0.5)) 
      
@@ -81,7 +81,7 @@ anther$y <- anther$y - min(anther$y)
 anther <- anther / PixInPin / 1000 # in meters
 par(pty="s")
 
-plot(anther$x, anther$y, ylab = "y position (meters)", xlab = "X position (meters)", 
+plot(anther$x, anther$y, ylab = "y position (meters)", xlab = "x position (meters)", 
                  xlim = c(0, 0.01), ylim = c(0, 0.01), pch = ".", col = rgb(0,0,0, 0.1))
 for(j in 1:length(anther$x)){
      points(anther$x[j], anther$y[j], pch = 20, col= rgb(0,0,0, 0.2), type = 'p')
@@ -110,18 +110,19 @@ indMax <- which(velMag == max(velMag))
 ttme <- -indMax:(length(velMag) - indMax) / 5000
 par(pty="m")
 
-plot(y = abs(vel$xvel), x = ttme[-length(ttme)], pch = ".", xlab = "time (s)", ylab = "x velocity(m/s)", type = "l")
+plot(y = abs(vel$xvel), x = ttme[-length(ttme)], pch = ".", xlab = "time (s)", ylab = "x velocity (m/s)", type = "l")
 
-plot(y = abs(vel$yvel), x = ttme[-length(ttme)], pch = ".", xlab = "time (s)", ylab = "y velocity(m/s)", type = "l")
+plot(y = abs(vel$yvel), x = ttme[-length(ttme)], pch = ".", xlab = "time (s)", ylab = "y velocity (m/s)", type = "l")
 
 plot(y = velMag, x = ttme[-length(ttme)], pch = ".", xlab = "time (s)", ylab = "total velocity (m/s)", type = "n")
 lines(y = velMag, x = ttme[-length(tme)], col = rgb(0,0,0,.5), lwd = 2)
 
 
 # velocity
+figDir = "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/KalmiaFigures/"
 
 par(pty="m")
-pdf(file = "velocityTrace.pdf", width = 5, height = 4)
+pdf(file = paste0(figDir, "velocityTrace.pdf"), width = 5, height = 4)
 
 velMaxAnth <- numeric(length(metDat$digitizedFile))
 for(ii in 1:length(metDat$digitizedFile)){
@@ -171,7 +172,7 @@ ttme <- -indMax:(length(velMag) - indMax) / 5000
 
 
      
-     if (ii == 1) plot(y = velMag, x = ttme[-length(ttme)], pch = ".", xlab = "time (s)", ylab = "velocity(m/s)", xlim = c(-0.012, 0.012), ylim = c(0,6), type = "n")
+     if (ii == 1) plot(y = velMag, x = ttme[-length(ttme)], pch = ".", xlab = "time (s)", ylab = "velocity (m/s)", xlim = c(-0.012, 0.012), ylim = c(0,6), type = "n")
 
      lines(y = velMag, x = ttme[-length(tme)], col = rgb(0,0,0,0.5))
      
@@ -188,7 +189,7 @@ dev.off()
 
 # Pollen Velocity
 par(pty="m")
-pdf(file = "velocityTracePollen.pdf", width = 5, height = 4)
+pdf(file = paste0(figDir, "velocityTracePollen.pdf"), width = 5, height = 4)
 
 velMaxPol <- numeric(length(metDat$digitizedFile))
 for(ii in 1:length(metDat$digitizedFile)){
@@ -225,7 +226,7 @@ for(ii in 1:length(metDat$digitizedFile)){
      
      if (ii == 1){
           plot(y = velMag, x = ttme[-length(ttme)], pch = ".", 
-               xlab = "time (s)", ylab = "velocity(m/s)", 
+               xlab = "time (s)", ylab = "velocity (m/s)", 
                xlim = c(-0.012, 0.1), ylim = c(0,5), type = "n")  
      } 
      
@@ -456,11 +457,18 @@ for(ii in 1:nrow(metDat)){
      #ANTHER
      anther <- data.frame(x = dp$pt3_cam1_X, y= dp$pt3_cam1_Y)
      anther <- anther[ complete.cases(anther), ]
+     # center anther, and make sure all anthers are traveling in 
+     # the same direction
+     anther$x <- scale(anther$x, center = TRUE, scale = FALSE)
+     if(lm(anther$x ~ I(1:length(anther$x)))$coefficients[2] > 0){
+          anther$x <- -anther$x
+     }
+     
      anther$x <- anther$x - min(anther$x)
      anther$y <- anther$y - min(anther$y)
      anther <- anther / PixInPin / 1000 # in meters
      
-#      if(anther$x[1] > 0.005) anther$x <- rev(anther$x)
+#     if(anther$x[1] > 0.005) anther$x <- rev(anther$x)
      
      # Smooth
      smspar <- 0.5
@@ -503,9 +511,17 @@ for(ii in 1:nrow(metDat)){
      #ANTHER
      anther <- data.frame(x = dp$pt3_cam1_X, y= dp$pt3_cam1_Y)
      anther <- anther[ complete.cases(anther), ]
+     # center anther, and make sure all anthers are traveling in 
+     # the same direction
+     anther$x <- scale(anther$x, center = TRUE, scale = FALSE)
+     if(lm(anther$x ~ I(1:length(anther$x)))$coefficients[2] > 0){
+          anther$x <- -anther$x
+     }
      anther$x <- anther$x - min(anther$x)
      anther$y <- anther$y - min(anther$y)
      anther <- anther / PixInPin / 1000 # in meters
+     
+     if(anther$x[1] > 0.005) anther$x <- rev(anther$x)
      
      # Smooth
      smspar <- 0.5
@@ -549,6 +565,12 @@ for(ii in 1:nrow(metDat)){
      #ANTHER
      anther <- data.frame(x = dp$pt3_cam1_X, y= dp$pt3_cam1_Y)
      anther <- anther[ complete.cases(anther), ]
+     # center anther, and make sure all anthers are traveling in 
+     # the same direction
+     anther$x <- scale(anther$x, center = TRUE, scale = FALSE)
+     if(lm(anther$x ~ I(1:length(anther$x)))$coefficients[2] > 0){
+          anther$x <- -anther$x
+     }
      anther$x <- anther$x - min(anther$x)
      anther$y <- anther$y - min(anther$y)
      anther <- anther / PixInPin / 1000 # in meters
@@ -601,6 +623,12 @@ for(ii in 1:length(metDat$digitizedFile)){
      #Anther
      anther <- data.frame(x = dp$pt3_cam1_X, y= dp$pt3_cam1_Y)
      anther <- anther[ complete.cases(anther), ]
+     # center anther, and make sure all anthers are traveling in 
+     # the same direction
+     anther$x <- scale(anther$x, center = TRUE, scale = FALSE)
+     if(lm(anther$x ~ I(1:length(anther$x)))$coefficients[2] > 0){
+          anther$x <- -anther$x
+     }
      anther$x <- anther$x - min(anther$x)
      anther$y <- anther$y - min(anther$y)
      

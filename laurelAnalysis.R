@@ -1,7 +1,7 @@
 ## Laurel Digitizations
 # Callin Switzer
 # June 21, 2015
-# Updated 16 Nov 2016
+# Updated 16 Nov 2016 - redone to make code better
 # Calculate velocity, position, and acceleration, of anther and pollen release 
 # from mountain laurels from Arboretum.
 
@@ -13,23 +13,66 @@ ipak <- function(pkg){
      sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c("ggplot2", "scales", "multcomp", 
-              "contrast", "plyr", "car", "lme4")
+packages <- c("ggplot2", "scales", "multcomp", "plyr", "car", "lme4")
 
 ipak(packages); rm(packages); rm(ipak)
 
 
+# read in metadata
 dfile <- "/Users/callinswitzer/Dropbox/ExperSummer2015/LaurelsOnly.csv"
 metDat <- read.csv(dfile)
 
 metDat <- metDat[metDat$digitizedFile!= "", ]
-
 
 # set constants:
 fps <- 5000 # frames per second
 
 
 # read in each .csv file for analysis
+# make a list of data frames
+digdirect <- "/Users/callinswitzer/Dropbox/ExperSummer2015/AllLaurelsDigitizations/"
+
+#for(ii in 1:length(metDat$digitizedFile)){
+     ddfile <- paste0(digdirect, metDat$digitizedFile[ii])
+     
+     dp <- read.csv(ddfile)
+     
+     # calibrate locations, based on digitized pin or other object
+     # calibration points
+     pin <- data.frame(dp$pt1_cam1_X, dp$pt1_cam1_Y, dp$pt2_cam1_X, dp$pt2_cam1_Y)
+     pin <- pin[complete.cases(pin), ]
+     
+     # get the number of pixels in the calibration
+     PixInPin <- (sqrt((pin$dp.pt1_cam1_X - pin$dp.pt2_cam1_X)^2 +
+                            (pin$dp.pt1_cam1_Y-pin$dp.pt2_cam1_Y)^2)) / 
+          metDat$CalSizeMM[ii] # to get to mm
+     
+     # get anther locations
+     anther <- data.frame(x = dp$pt3_cam1_X, y= dp$pt3_cam1_Y)
+     anther = anther[ complete.cases(anther), ]
+     
+
+
+#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 for(ii in 1:length(metDat$digitizedFile)){
      ddfile <- paste("/Users/callinswitzer/Dropbox/ExperSummer2015/AllLaurelsDigitizations/", metDat$digitizedFile[ii], sep = "")

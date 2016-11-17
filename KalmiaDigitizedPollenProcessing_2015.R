@@ -114,8 +114,8 @@ for(ii in 1:length(metDat$digitizedFile)){
      bar = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(x){
           newName = paste0(x, ".abs")
           tmp <- antherPoll[,x] / PixInPin / 1000
-          #antherPoll[,newName] <<- tmp - na.omit(tmp)[1]
-          antherPoll[,newName] <<- tmp - min(na.omit(tmp))
+          antherPoll[,newName] <<- tmp - na.omit(tmp)[1]
+          #antherPoll[,newName] <<- tmp - min(na.omit(tmp))
      })
      
      # # check position
@@ -142,25 +142,108 @@ for(ii in 1:length(metDat$digitizedFile)){
      bam = sapply(X = c("anthx.1.abs.vel", "anthy.1.abs.vel", "polx.1.abs.vel", "poly.1.abs.vel"), 
                    FUN = function(x){
                         newName = paste0(x, ".acc")
-                        tmp <-  c(NaN, diff(antherPoll[,x])) * fps # add a NaN to beginning of data
+                        # add a NaN to beginning of data
+                        tmp <-  c(NaN, diff(antherPoll[,x])) * fps 
                         antherPoll[,newName] <<- tmp 
                    })
      
-     # add columns to show acceleration magnitude -- should be in m/s/s
+     #position
+     plot(antherPoll$anthx.1.abs, y = antherPoll$anthy.1.abs, type = 'b')
+     plot(antherPoll$anthx.1.abs, type = 'l', xlim = c(0, 50))
+     lines(antherPoll$anthy.1.abs, type = 'l', xlim = c(0, 50), col = 'blue')
+     
+     
+     # velocity
+     plot(antherPoll$anthx.1.abs.vel, type = 'l', xlim = c(0, 50))
+     lines(antherPoll$anthy.1.abs.vel, type = 'l', xlim = c(0, 50), col = 'blue')
+     
+     plot(antherPoll$anthx.1.abs.vel.acc, type = 'l', xlim = c(0, 50))
+     lines(antherPoll$anthy.1.abs.vel.acc, type = 'l', xlim = c(0, 50), col = 'blue')
+
+     
+     # add columns to show acceleration -- should be in m/s/s
      # adds X and Y accelerations, using Pythagorean Theorem
-     antherPoll$anthAccMag = sqrt(antherPoll$anthx.1.abs.vel.acc^2 + 
-                                       antherPoll$anthy.1.abs.vel.acc^2)
-     antherPoll$polAccMag = sqrt(antherPoll$polx.1.abs.vel.acc^2 +
-                                      antherPoll$poly.1.abs.vel.acc^2)
+    
+    signedSqAcc = antherPoll$anthx.1.abs.vel.acc^2  + 
+                   antherPoll$anthy.1.abs.vel.acc^2  
+     
+     antherPoll$anthAcc.1 <- sqrt(abs(signedSqAcc)) * sign(signedSqAcc)
+     
+     signedSqAcc_pol = antherPoll$polx.1.abs.vel.acc^2 * 
+                         sign(antherPoll$polx.1.abs.vel.acc) +
+                              antherPoll$poly.1.abs.vel.acc * 
+                         sign(antherPoll$poly.1.abs.vel.acc)
+     antherPoll$polAcc.1 <- sqrt(abs(signedSqAcc_pol)) * sign(signedSqAcc_pol)
      
      
-     # add column to show total displacement (from minimum) 
+     # calculate displacement (total distance, in meters)
+     dd1 <- sqrt(diff(antherPoll$anthx.1.abs)^2 + 
+                      diff(antherPoll$anthy.1.abs)^2)
+     dd1[is.na(dd1)] <- 0
+     antherPoll$distanth <- c(0, cumsum(dd1))
+     antherPoll$distanth[is.na(antherPoll$anthy.1.abs)] <- NaN
+     
+     dd2 <- sqrt(diff(antherPoll$polx.1.abs)^2 + 
+                      diff(antherPoll$poly.1.abs)^2)
+     dd2[is.na(dd2)] <- 0
+     antherPoll$distpoll <- c(0, cumsum(dd2))
+     antherPoll$distpoll[is.na(antherPoll$poly.1.abs)] <- NaN
+     
+     
+     # #check
+     # plot(antherPoll$polx.1.abs, antherPoll$poly.1.abs, asp = 1)
+     # 
+     # with(antherPoll, {
+     #      plot(y = distpoll,x =  tme)
+     #      points( y=poly.1.abs, x = tme, pch = 20, col = rgb(0,1,1,0.5))
+     # })
+     # 
+     # plot(antherPoll$anthx.1.abs, antherPoll$anthy.1.abs, asp = 1)
+     # 
+     # with(antherPoll, {
+     #      plot(y = antherPoll$distanth, x =  antherPoll$tme, col = rgb(1,0,0,1))
+     #      points( y=anthy.1.abs, x = tme, pch = 20, col = rgb(0,1,0,0.5))
+     #      points( y=anthx.1.abs, x = tme, pch = 20, col = rgb(0,1,0,0.5))
+     # })
+     
+     # # smooth
+     # smspar <- 0.5 # smoothing parameter
+     # foob = sapply(X = c("anthx.1.abs", "anthy.1.abs", 
+     #                     "polx.1.abs", "poly.1.abs"), FUN = function(x){
+     #      
+     #      # fit smooth
+     #      sm1 <- smooth.spline(y = na.omit(antherPoll[, x]), 
+     #                           x = antherPoll$tme[!is.na(antherPoll[, x])], 
+     #                           spar = smspar) 
+     #      
+     #      # predict new data via interpolation
+     #      sm2 <- predict(sm1, x = seq(min(antherPoll$tme[!is.na(antherPoll[, x])]), 
+     #                                  max(antherPoll$tme[!is.na(antherPoll[, x])]), 
+     #                                  length.out = 1000))
+     #      
+     #      newName <- paste0(strsplit(x, "\\.")[[1]][1], "_disp")
+     #      newT <- paste0(newName, "_time")
+     #      
+     #      return(data.frame(sm2))
+     #      
+     # })
+     # 
+     # foob[['x']]
+     # 
+     
+     
+     # add column to show total distance (from minimum) 
      # in meters
-     antherPoll$polDispMag = sqrt(antherPoll$polx.1.abs^2 +
-                                    antherPoll$poly.1.abs^2)
-     antherPoll$anthDispMag = sqrt(antherPoll$anthx.1.abs^2 + 
-                                       antherPoll$anthy.1.abs^2)
-     
+     # this is not the same as total distance traveled
+     # antherPoll$polDispMag = sqrt(antherPoll$polx.1.abs^2 +
+     #                                antherPoll$poly.1.abs^2)
+     # antherPoll$anthDispMag = sqrt(antherPoll$anthx.1.abs^2 + 
+     #                                   antherPoll$anthy.1.abs^2)
+     # 
+     # plot(antherPoll$polDispMag)
+     # points(antherPoll$distpoll,pch = 20,  col = rgb(0,1,0, 0.5))
+     # plot(antherPoll$anthDispMag, ylim = c(0,0.02))
+     # points(antherPoll$distanth,pch = 20,  col = rgb(0,1,0, 0.5))
      
      # check
      # plot(y = antherPoll$anthAccMag,  x= antherPoll$tme, xlim = c(0, 0.02), type = 'l')
@@ -172,8 +255,8 @@ for(ii in 1:length(metDat$digitizedFile)){
                    pixelConversion = PixInPin, 
                    maxAnthVel = max(antherPoll$anthVelMag, na.rm = TRUE), 
                    maxPollVel = max(antherPoll$polVelMag, na.rm = TRUE), 
-                   maxAnthAcc = max(antherPoll$anthAccMag, na.rm = TRUE), 
-                   maxPollAcc = max(antherPoll$polAccMag, na.rm = TRUE), 
+                   maxAnthAcc = max(antherPoll$anthAcc.1, na.rm = TRUE), 
+                   maxPollAcc = max(antherPoll$polAcc.1, na.rm = TRUE), 
                    anthPollDF = antherPoll)
      newL[[ii]] = smList
 }
@@ -184,7 +267,7 @@ newL[[1]]$file
 with(newL[[1]], c(maxAnthVel, maxPollVel))
 
 ii = 1
-plot(newL[[ii]]$anthPollDF$anthDispMag)
+plot(newL[[ii]]$anthPollDF$distanth)
 
 # save dataframe
 saveDir <- "/Users/callinswitzer/Dropbox/ExperSummer2015/Kalmia2015FiguresAndData/"
@@ -203,18 +286,19 @@ save(newL, file = paste0(saveDir, "Kalm2015DigitizedDataset.rda"))
 #[REFREF]
 ### HERE: Figure out displacement -- want to align with steep slopes at 0
 ## Why isn't velocity max when slope is greatest
+# calculate velocity in two different ways and see if they're the same!
 
 ii = 1
-plot(y = newL[[ii]]$anthPollDF$anthDispMag, x = newL[[ii]]$anthPollDF$tme, 
+plot(y = newL[[ii]]$anthPollDF$distanth, x = newL[[ii]]$anthPollDF$tme, 
      xlab = 'time (s)', ylab = 'displacement from initial position (m)', 
-     xlim = c(-0.006, 0.012), ylim = c(0,0.02), type = 'n')
+     xlim = c(-0.012, 0.012), ylim = c(0,0.08), type = 'n')
 
 # align sections, based on max velocity
 for(ii in 1:length(newL)){
      tmp2 <- newL[[ii]]$anthPollDF
      timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthVelMag)]
      
-     lines(y = newL[[ii]]$anthPollDF$anthDispMag, x = timeCentered, 
+     lines(y = newL[[ii]]$anthPollDF$distanth, x = timeCentered, 
            col = 'red')
 }
 abline(v = 0)
@@ -236,21 +320,113 @@ for(ii in 1:length(newL)){
 abline(v = 0)
 
 
-# accel
-plot(y = newL[[ii]]$anthPollDF$anthAccMag, x = newL[[ii]]$anthPollDF$tme, 
+# calculate velocity in a different way, and see if it's the same
+# velocity
+plot(y = newL[[ii]]$anthPollDF$anthVelMag, x = newL[[ii]]$anthPollDF$tme, 
      xlab = 'time (s)', ylab = 'velocity (m/s)', type = 'n', 
-     xlim = c(-0.01, 0.02), ylim = c(0, 6000))
+     xlim = c(-0.01, 0.02), ylim = c(0, 6))
+
+# align sections, based on max velocity
+# should be called speed, since it doesn't take direction into account
+for(ii in 1:length(newL)){
+     tmp2 <- newL[[ii]]$anthPollDF
+     timeCentered <- tmp2$tme- tmp2$tme[which.max(tmp2$anthVelMag)]
+     
+     vel <- c(NA, diff(tmp2$distanth)*5000)
+     
+     lines(y = vel, x = timeCentered, 
+           col = 'green')
+}
+abline(v = 0) # same
+
+
+# accel
+plot(y = newL[[ii]]$anthPollDF$anthAcc.1, x = newL[[ii]]$anthPollDF$tme, 
+     xlab = 'time (s)', ylab = 'acceleration (m/s/s)', type = 'n', 
+     xlim = c(-0.01, 0.02), ylim = c(-6000, 6000))
 
 # align sections, based on max velocity
 for(ii in 1:length(newL)){
      tmp2 <- newL[[ii]]$anthPollDF
-     timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthAccMag)]
+     timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthAcc.1)]
      
-     lines(y = newL[[ii]]$anthPollDF$anthAccMag, x = timeCentered, 
+     lines(y = newL[[ii]]$anthPollDF$anthAcc.1, x = timeCentered, 
            col = 'red')
 }
 abline(v = 0)
 
+
+# calculate acc in a different way, and see if it's the same
+# acceleration
+plot(y = newL[[ii]]$anthPollDF$anthAcc.1, x = newL[[ii]]$anthPollDF$tme, 
+     xlab = 'time (s)', ylab = 'acceleration (m/s/s)', type = 'n', 
+     xlim = c(-0.01, 0.02), ylim = c(-3000, 3000))
+
+# align sections, based on max velocity
+for(ii in 1:length(newL)){
+     tmp2 <- newL[[ii]]$anthPollDF
+     timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthAcc.1)]
+     
+     v1 <- diff(tmp2$distanth)*5000
+     acc <- c(NA, NA, (diff(v1)*5000))
+     
+     lines(y = acc, x = timeCentered, 
+           col = 'pink')
+     abline(h = 0)
+     
+     lines(y = tmp2$anthAcc.1, x = timeCentered, 
+           col = 'red')
+}
+abline(v = 0) # not the same
+
+###############################################
+### LOOK AT DIST, VEL, ACC
+
+par(mfrow = c(3,1))
+ii = 1
+tmp2 <- newL[[ii]]$anthPollDF
+
+
+#plot distance traveled for anther
+timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$polVelMag)]
+plot(y = tmp2$distpoll, x = timeCentered, 
+      col = 'red')
+
+# velocity
+par(mfrow= c(2,1))
+timeCentered <- tmp2$tme- tmp2$tme[which.max(tmp2$anthVelMag)]
+vel <- c(NA, diff(tmp2$distanth)*5000)
+plot(y = vel, x = timeCentered, 
+      col = 'green', type = 'l', xlim = c(0, 0.01))
+
+
+# Acceleration
+timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthVelMag)]
+
+v1 <- diff(tmp2$distanth)*5000
+acc <- c(NA, NA, (diff(v1)*5000))
+
+plot(y = acc, x = timeCentered, 
+      col = 'pink', type = 'l', xlim = c(0, 0.01), ylim = c(-3000, 3000))
+lines(y = tmp2$anthAcc.1, x = timeCentered, 
+      col = 'blue', pch = 20)
+abline(h = 0)
+
+
+
+
+
+timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthAcc.1)]
+
+v1 <- diff(tmp2$distanth)*5000
+acc <- c(NA, NA, (diff(v1)*5000))
+
+lines(y = acc, x = timeCentered, 
+      col = 'pink')
+abline(h = 0)
+
+lines(y = newL[[ii]]$anthPollDF$anthAcc.1, x = timeCentered, 
+      col = 'red')
 
 
 

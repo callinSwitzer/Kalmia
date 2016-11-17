@@ -110,10 +110,12 @@ for(ii in 1:length(metDat$digitizedFile)){
      antherPoll$tme = 0: (nrow(antherPoll) - 1) / fps # time
      
      # add columns with absolute position into dataframe (calculated from smoothed data)
+     # calculate position from starting point, not from minimum point
      bar = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(x){
           newName = paste0(x, ".abs")
           tmp <- antherPoll[,x] / PixInPin / 1000
-          antherPoll[,newName] <<- tmp - min(tmp, na.rm = TRUE)
+          #antherPoll[,newName] <<- tmp - na.omit(tmp)[1]
+          antherPoll[,newName] <<- tmp - min(na.omit(tmp))
      })
      
      # # check position
@@ -152,6 +154,13 @@ for(ii in 1:length(metDat$digitizedFile)){
                                       antherPoll$poly.1.abs.vel.acc^2)
      
      
+     # add column to show total displacement (from minimum) 
+     # in meters
+     antherPoll$polDispMag = sqrt(antherPoll$polx.1.abs^2 +
+                                    antherPoll$poly.1.abs^2)
+     antherPoll$anthDispMag = sqrt(antherPoll$anthx.1.abs^2 + 
+                                       antherPoll$anthy.1.abs^2)
+     
      
      # check
      # plot(y = antherPoll$anthAccMag,  x= antherPoll$tme, xlim = c(0, 0.02), type = 'l')
@@ -174,12 +183,78 @@ for(ii in 1:length(metDat$digitizedFile)){
 newL[[1]]$file
 with(newL[[1]], c(maxAnthVel, maxPollVel))
 
+ii = 1
+plot(newL[[ii]]$anthPollDF$anthDispMag)
+
 # save dataframe
 saveDir <- "/Users/callinswitzer/Dropbox/ExperSummer2015/Kalmia2015FiguresAndData/"
 save(newL, file = paste0(saveDir, "Kalm2015DigitizedDataset.rda"))
 
 # how to load in dataset, if you need to do it in the future
-load(paste0(saveDir, "Kalm2015DigitizedDataset.rda"))
+# load(paste0(saveDir, "Kalm2015DigitizedDataset.rda"))
+
+
+##################################################################
+##
+## Make Velocity, Acceleration, and Displacement Curves
+##
+##################################################################
+
+#[REFREF]
+### HERE: Figure out displacement -- want to align with steep slopes at 0
+## Why isn't velocity max when slope is greatest
+
+ii = 1
+plot(y = newL[[ii]]$anthPollDF$anthDispMag, x = newL[[ii]]$anthPollDF$tme, 
+     xlab = 'time (s)', ylab = 'displacement from initial position (m)', 
+     xlim = c(-0.006, 0.012), ylim = c(0,0.02), type = 'n')
+
+# align sections, based on max velocity
+for(ii in 1:length(newL)){
+     tmp2 <- newL[[ii]]$anthPollDF
+     timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthVelMag)]
+     
+     lines(y = newL[[ii]]$anthPollDF$anthDispMag, x = timeCentered, 
+           col = 'red')
+}
+abline(v = 0)
+
+
+# velocity
+plot(y = newL[[ii]]$anthPollDF$anthVelMag, x = newL[[ii]]$anthPollDF$tme, 
+     xlab = 'time (s)', ylab = 'velocity (m/s)', type = 'n', 
+     xlim = c(-0.01, 0.02), ylim = c(0, 6))
+
+# align sections, based on max velocity
+for(ii in 1:length(newL)){
+     tmp2 <- newL[[ii]]$anthPollDF
+     timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthVelMag)]
+     
+     lines(y = newL[[ii]]$anthPollDF$anthVelMag, x = timeCentered, 
+           col = 'red')
+}
+abline(v = 0)
+
+
+# accel
+plot(y = newL[[ii]]$anthPollDF$anthAccMag, x = newL[[ii]]$anthPollDF$tme, 
+     xlab = 'time (s)', ylab = 'velocity (m/s)', type = 'n', 
+     xlim = c(-0.01, 0.02), ylim = c(0, 6000))
+
+# align sections, based on max velocity
+for(ii in 1:length(newL)){
+     tmp2 <- newL[[ii]]$anthPollDF
+     timeCentered <- tmp2$tme - tmp2$tme[which.max(tmp2$anthAccMag)]
+     
+     lines(y = newL[[ii]]$anthPollDF$anthAccMag, x = timeCentered, 
+           col = 'red')
+}
+abline(v = 0)
+
+
+
+
+
 
 ##### OLD BELOW THIS LINE ######################
 

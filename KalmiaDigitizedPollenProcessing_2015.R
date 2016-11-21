@@ -5,6 +5,11 @@
 # Calculate velocity, position, and acceleration, of anther and pollen release 
 # from mountain laurels from Arboretum.
 
+## TODO:
+# smooth, and impute points to get better estimates
+# try different smoothing methods -- wavelet analysis?, butterworth filter?
+
+
 
 # Setup
 ipak <- function(pkg){
@@ -26,7 +31,6 @@ metDat <- metDat[metDat$digitizedFile!= "", ]
 
 # set constants:
 fps <- 5000 # frames per second
-
 
 # read in each .csv file for analysis
 # make a list of data frames
@@ -148,17 +152,34 @@ for(ii in 1:length(metDat$digitizedFile)){
                    })
      
      #position
-     plot(antherPoll$anthx.1.abs, y = antherPoll$anthy.1.abs, type = 'b')
-     plot(antherPoll$anthx.1.abs, type = 'l', xlim = c(0, 50))
+     plot(antherPoll$anthx.1.abs, y = antherPoll$anthy.1.abs, type = 'b', ylim = c(0, 0.06), asp = 1)
+     lines(antherPoll$polx.1.abs, antherPoll$poly.1.abs, type = 'b', xlim = c(0, 50), col = 'red')
+     
+     par(mfrow = c(3,1), mai = c(0,.5,0,0))
+     plot(antherPoll$anthx.1.abs, type = 'l', xlim = c(0, 50), ylim = c(-0.004, 0.018), ylab = "anther position")
      lines(antherPoll$anthy.1.abs, type = 'l', xlim = c(0, 50), col = 'blue')
+     lines(antherPoll$distanth, type = 'l', col = 'red')
+     legend("topright", legend = c("x", "y", "total"), lty = 1, col = c("black", "blue", "red"))
+     abline(h = 0, lty = 2)
+     abline(v = c(15, 14, 13), lty = 2)
      
      
      # velocity
-     plot(antherPoll$anthx.1.abs.vel, type = 'l', xlim = c(0, 50))
-     lines(antherPoll$anthy.1.abs.vel, type = 'l', xlim = c(0, 50), col = 'blue')
+     plot(antherPoll$anthx.1.abs.vel, type = 'l', xlim = c(0,50), ylim = c(-3.1, 4.1), ylab = "anther speed")
+     lines(antherPoll$anthy.1.abs.vel, type = 'l', col = 'blue')
+     lines(antherPoll$anthVelMag, type = 'l', col = 'red')
+     abline(h = 0, lty = 2)
+     abline(v = c(15, 14, 13), lty = 2)
      
-     plot(antherPoll$anthx.1.abs.vel.acc, type = 'l', xlim = c(0, 50))
+     
+     plot(antherPoll$anthx.1.abs.vel.acc, type = 'l', xlim = c(0, 50), ylab = "anther acceleration", ylim =c(-3000, 3000))
      lines(antherPoll$anthy.1.abs.vel.acc, type = 'l', xlim = c(0, 50), col = 'blue')
+     lines(antherPoll$anthAcc.1)
+     a1 <- c(NA, diff(antherPoll$anthVelMag))*fps
+     lines(a1, col = 'red')
+     abline(h = 0, lty = 2)
+     abline(v = c(15, 14, 13), lty = 2)
+     
 
      
      # add columns to show acceleration -- should be in m/s/s

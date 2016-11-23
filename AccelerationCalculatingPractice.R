@@ -136,7 +136,7 @@ get.ellipse <- function( fit, n=360 )
      cbind(x=x, y=y) 
 }
 
-efit <- fit.ellipse()
+
 
 # read in metadata
 dfile <- "/Users/callinswitzer/Dropbox/ExperSummer2015/LaurelsOnly.csv"
@@ -171,6 +171,7 @@ newD <- newD[nrow(newD):1, ]
 # x position is changing in even intervals
 # y is not -- non constant acceleration
 # newD <- data.frame(x = 1:3000 / 1000, y = sin(1:3000/1000))
+# newD <- data.frame(x = 1:3000 / 1000, y = log(1:3000/1000))
 newD <- within(newD, {
      x = x - min(x)
      y = y - min(y)
@@ -234,7 +235,7 @@ plot(round(tv, 5), col = 'red', ylab = "velocity") # should be constant
 
 
 # tangential acceleration -- should always be 0, because
-# speed is constant
+# speed is constant for a circle
 ta <- c(NA, diff(tv)*fps)
 plot(round(ta, 5))
 tail(ta)

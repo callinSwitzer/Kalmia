@@ -11,6 +11,8 @@
 ## TODO:
 # use cross-validation to decide smoothing parameters or plot noise/resoluation tradeoff
 # or simply justify the choice -- by using visual inspection
+# compute acceleration and velocity for different values of smoothing parameters
+# idea -- show video with smoothed vs. unsmoothed points added -- background subtracted.
 
 
 
@@ -21,7 +23,7 @@ ipak <- function(pkg){
      sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c("ggplot2", "scales", "multcomp", "plyr", "car", "lme4", "signal", "mgcv")
+packages <- c("ggplot2", "scales", "multcomp", "plyr", "car", "lme4", "signal")
 
 ipak(packages)
 
@@ -35,146 +37,415 @@ metDat <- metDat[metDat$digitizedFile!= "", ]
 # set constants:
 fps <- 5000 # frames per second
 
-ii = 16
+ii = 11
+
 
 # read in each .csv file for analysis
 # make a list of data frames
 digdirect <- "/Users/callinswitzer/Dropbox/ExperSummer2015/AllLaurelsDigitizations/"
-ddfile <- paste0(digdirect, metDat$digitizedFile[ii])
 
-dp <- read.csv(ddfile)
 
-# calibrate locations, based on digitized pin or other object
-# calibration points
-pin <- data.frame(dp$pt1_cam1_X, dp$pt1_cam1_Y, dp$pt2_cam1_X, dp$pt2_cam1_Y)
-pin <- pin[complete.cases(pin), ]
+newDF <- data.frame()
 
-# get the number of pixels in the calibration
-PixInPin <- (sqrt((pin$dp.pt1_cam1_X - pin$dp.pt2_cam1_X)^2 +
-                       (pin$dp.pt1_cam1_Y-pin$dp.pt2_cam1_Y)^2)) / 
-     metDat$CalSizeMM[ii] # to get to mm
-
-# get anther and pollen locations
-antherPoll <- data.frame(anthx = dp$pt3_cam1_X, anthy= dp$pt3_cam1_Y, 
-                         polx = dp$pt4_cam1_X, poly= dp$pt4_cam1_Y)
-
-# gives only rows where either anth and pollen are complete
-antherPoll = antherPoll[ complete.cases(antherPoll[c('anthx')]) | 
-                              complete.cases(antherPoll[c('polx')]), ]
-
-# if x value starts to right of screen, reverse points,
-# so all x values start on the left part of the screen at 0
-if(lm(antherPoll[,1] ~ I(1:length( antherPoll[,1])))$coefficients[2] < 0 ){
-     antherPoll$anthx <- metDat[ii,'vidWidth'] - antherPoll$anthx
-     antherPoll$polx <- metDat[ii,'vidWidth'] - antherPoll$polx
+for(ii in 1:nrow(metDat)){
+     
+     
+     # ignore ii ==7, because the video started too late
+     if(ii == 7) next
+     
+     ddfile <- paste0(digdirect, metDat$digitizedFile[ii])
+     
+     dp <- read.csv(ddfile)
+     
+     # calibrate locations, based on digitized pin or other object
+     # calibration points
+     pin <- data.frame(dp$pt1_cam1_X, dp$pt1_cam1_Y, dp$pt2_cam1_X, dp$pt2_cam1_Y)
+     pin <- pin[complete.cases(pin), ]
+     
+     # get the number of pixels in the calibration
+     PixInPin <- (sqrt((pin$dp.pt1_cam1_X - pin$dp.pt2_cam1_X)^2 +
+                            (pin$dp.pt1_cam1_Y-pin$dp.pt2_cam1_Y)^2)) / 
+          metDat$CalSizeMM[ii] # to get to mm
+     
+     
+     # get anther and pollen locations
+     antherPoll <- data.frame(anthx = dp$pt3_cam1_X, anthy= dp$pt3_cam1_Y, 
+                              polx = dp$pt4_cam1_X, poly= dp$pt4_cam1_Y)
+     
+     # get frame where pollen starts and leaves
+     antherPoll$polStart = 1:nrow(antherPoll) == metDat$framePollenStartedLeaving[ii]
+     antherPoll$polEnd = 1:nrow(antherPoll) == metDat$framePollenReleaseComplete[ii]
+     
+     # gives only rows where either anth and pollen are complete
+     antherPoll = antherPoll[ complete.cases(antherPoll[c('anthx')]) | 
+                                   complete.cases(antherPoll[c('polx')]), ]
+     
+     # if x value starts to right of screen, reverse points,
+     # so all x values start on the left part of the screen at 0
+     if(lm(antherPoll[,1] ~ I(1:length( antherPoll[,1])))$coefficients[2] < 0 ){
+          antherPoll$anthx <- metDat[ii,'vidWidth'] - antherPoll$anthx
+          antherPoll$polx <- metDat[ii,'vidWidth'] - antherPoll$polx
+     }
+     
+     
+     # cbind data frame, to add smoothed columns
+     antherPoll <- data.frame(cbind(antherPoll, antherPoll))
+     
+     # plot(x = antherPoll$anthx.1, y = antherPoll$anthy.1)
+     # plot(antherPoll$anthx.1)
+     
+     # smooth with SG is based on the least-squares fitting of 
+     # polynomials to segments of the data
+     
+     # other options include smoothing splines (tend to "cut the corners" of curves)
+     # butterworth filters (inaccurate at endpoints)
+     # Kernel smoothing
+     
+     x <- na.omit(antherPoll$anthy.1)
+     xx <- c(x[round(length(x)/ 2):1], x, x[round(length(x)):round(length(x)/ 2)])
+     want = c(rep(FALSE, round(length(x)/ 2)), rep(TRUE, length(x)), rep(FALSE, round(length(x)/2)))
+     sg <- sgolayfilt(xx, p = 3, n = 11) # Savitzky-Golay filter
+     # plot(xx[want], type="b", col = 'red', pch = 20)
+     # points(sg[want], pch = 20, type = 'o') # smoothed SG data
+     
+     
+     W = 0.1
+     b1 <- butter(5, W, type = 'low')
+     y1 <- filtfilt(b1, xx)
+     
+     # points(y1[want], pch=20, col='grey')
+     
+     
+     
+     
+     
+     # filter with Savitzky-Golay filter or Butterworth filter
+     # degree = 3, frame size = 11 points
+     foo = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(y){
+          #sm1 <- sgolayfilt(na.omit(antherPoll[, x]), p = 3, n = 51) 
+          
+          # butterworth filter
+          x <- na.omit(antherPoll[, y])
+          xx <- c(x[round(length(x)/ 2):1], x, x[round(length(x)):round(length(x)/ 2)])
+          want = c(rep(FALSE, round(length(x)/ 2)), rep(TRUE, length(x)), rep(FALSE, round(length(x)/2)))
+          W = 0.07 # sweet spot seems to be about 0.2
+          b1 <- butter(5, W, type = 'low')
+          y1 <- filtfilt(b1, xx)
+          sm1 <- y1[want]
+          antherPoll[, y][complete.cases(antherPoll[, y])] <<- sm1
+     })
+     
+     # add time to data frame
+     antherPoll$tme = 0: (nrow(antherPoll) - 1) / fps # time
+     
+     # add columns with absolute position into dataframe (calculated from smoothed data)
+     # calculate position from starting point, not from minimum point
+     bar = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(x){
+          newName = paste0(x, ".abs")
+          tmp <- antherPoll[,x] / PixInPin / 1000
+          antherPoll[,newName] <<- tmp - na.omit(tmp)[1]
+          #antherPoll[,newName] <<- tmp - min(na.omit(tmp))
+     })
+     
+     
+     
+     # add columns to show velocity, based on smoothed, absolute position
+     # velocity is in m/s
+     bat = sapply(X = c("anthx.1.abs", "anthy.1.abs", "polx.1.abs", "poly.1.abs"), 
+                  FUN = function(x){
+                       newName = paste0(x, ".vel")
+                       tmp <-  c(NaN, diff(antherPoll[,x])) * fps # add a NaN to beginning of data
+                       antherPoll[,newName] <<- tmp 
+                  })
+     
+     # calculate speed
+     antherPoll$anthspeed = sqrt(antherPoll$anthx.1.abs.vel^2 + antherPoll$anthy.1.abs.vel^2)
+     antherPoll$polspeed = sqrt(antherPoll$polx.1.abs.vel^2 + antherPoll$poly.1.abs.vel^2)
+     
+     # plot(antherPoll$anthspeed)
+     
+     ###########################################
+     # pollen acceleration
+     polVelocity = cbind(antherPoll$polx.1.abs.vel, antherPoll$poly.1.abs.vel)
+     polSpeed = antherPoll$polspeed
+     # plot(polSpeed)
+     tme = antherPoll$tme
+     polAccel = data.frame(rbind(c(NA, NA), apply(polVelocity, MARGIN = 2, FUN = diff))) * fps
+     # par(mfrow =c(2,2))
+     # plot(polAccel[,1], x = antherPoll$tme, type = 'l') # calculated
+     # plot(polAccel[,2], x = antherPoll$tme, type = 'l')
+     
+     
+     # unit tangent vector
+     T_t = polVelocity / polSpeed
+     
+     DT = data.frame(rbind(c(NA, NA), apply(T_t, MARGIN = 2, FUN = diff))) * fps
+     NormDT = sqrt(DT[,1]^2 + DT[,2]^2)
+     Curvature = NormDT / polSpeed
+     
+     # compute a_N (normal acceleration) and a_T (tangential acceleration)
+     # a_T = ds/dt
+     a_T =  c(NA, diff(polSpeed) * fps)
+     N_t = data.frame(t(sapply(1:nrow(DT), FUN = function(x) unlist(DT[x, ] / NormDT[x]))))
+     # plot(a_T, type = "l", ylim = c(-3000, 3000))
+     
+     # a_N = speed^2 * curvature
+     a_N = polSpeed^2 * Curvature
+     
+     
+     # check total accel by adding normal and tangential accelerations
+     # a_total = a_T * T_t + a_N * N_t
+     a_total = as.data.frame(t(sapply(X = 1:nrow(polAccel), FUN  = function(x) a_T[x] * T_t[x, ] + a_N[x] * N_t[x,] )))
+     # plot(a_total) # includes both x and y coordinates
+     # plot(polAccel)
+     
+     # par(mfrow = c(2,2))
+     # plot(unlist(a_total[,1]))
+     # plot(unlist(a_total[,2]))
+     # plot(polAccel[,1])
+     # plot(polAccel[,2])
+     
+     
+     # plot(a_N)
+     # plot(a_T)
+     # 
+     a_T_Pol = a_T
+     # plot(a_T, x = tme)
+     # plot(a_N, x = tme)
+     
+     
+     # calculate magnitude of acceleration, using two methods
+     # 1. Normal and tangential acceleration
+     a_mag1 = sqrt(a_T^2 + a_N^2)
+     # plot(a_mag1)
+     
+     amag2 = sqrt(polAccel[,1]^2 + polAccel[,2]^2)
+     # plot(amag2, type = 'l')
+     # plot(polVelocity[,1])
+     
+     
+     ########################################
+     
+     ###########################################
+     # anther acceleration
+     anthVelocity = cbind(antherPoll$anthx.1.abs.vel, antherPoll$anthy.1.abs.vel)
+     anthSpeed = antherPoll$anthspeed
+     # plot(anthSpeed)
+     tme = antherPoll$tme
+     anthAccel = data.frame(rbind(c(NA, NA), apply(anthVelocity, MARGIN = 2, FUN = diff))) * fps
+     # par(mfrow =c(2,2))
+     # # plot(anthAccel[,1], x = antherPoll$tme, type = 'l') # calculated
+     # plot(anthAccel[,2], x = antherPoll$tme, type = 'l')
+     
+     
+     # unit tangent vector
+     T_t = anthVelocity / anthSpeed
+     
+     DT = data.frame(rbind(c(NA, NA), apply(T_t, MARGIN = 2, FUN = diff))) * fps
+     NormDT = sqrt(DT[,1]^2 + DT[,2]^2)
+     Curvature = NormDT / anthSpeed
+     
+     # compute a_N (normal acceleration) and a_T (tangential acceleration)
+     # a_T = ds/dt
+     a_T =  c(NA, diff(anthSpeed) * fps)
+     a_T_anth = a_T
+     N_t = data.frame(t(sapply(1:nrow(DT), FUN = function(x) unlist(DT[x, ] / NormDT[x]))))
+     # plot(a_T, type = "l", ylim = c(-3000, 3000))
+     
+     # a_N = speed^2 * curvature
+     a_N = anthSpeed^2 * Curvature
+     
+     
+     # check total accel by adding normal and tangential accelerations
+     # a_total = a_T * T_t + a_N * N_t
+     a_total = as.data.frame(t(sapply(X = 1:nrow(anthAccel), FUN  = function(x) a_T[x] * T_t[x, ] + a_N[x] * N_t[x,] )))
+     # plot(a_total) # includes both x and y coordinates
+     # plot(anthAccel)
+     
+     # par(mfrow = c(2,2))
+     # plot(unlist(a_total[,1]))
+     # plot(unlist(a_total[,2]))
+     # plot(anthAccel[,1])
+     # plot(anthAccel[,2])
+     
+     
+     # plot(a_N)
+     # plot(a_T)
+     
+     # par(mfrow = c(2,1))
+     # plot(a_T, x = tme, type = 'l')
+     # max(a_T, na.rm = TRUE)
+     # which.max(a_T)
+     
+     # plot(a_T_Pol, x = tme, type = 'l')
+     # max(a_T_Pol, na.rm = TRUE)
+     # which.max(a_T_Pol)
+     # 
+     tmeRoll <- seq(from = -which(antherPoll$polStart) + 1, length.out = length(tme)) / fps
+     
+     dfi <- data.frame(anthSpeed, polSpeed, a_T_anth, a_T_Pol, tme, 
+                       trial = metDat$VideoName[ii], 
+                       tmeStart = antherPoll$polStart,
+                       tmeEnd = antherPoll$polEnd, 
+                       centeredTime = tmeRoll)
+     
+     newDF <- rbind(newDF,dfi) 
+     print(ii)
+     
 }
 
+theme_set(theme_classic())
 
-# cbind data frame, to add smoothed columns
-antherPoll <- data.frame(cbind(antherPoll, antherPoll))
+savePath = "/Users/callinswitzer/Dropbox/ExperSummer2015/Kalmia2015FiguresAndData/"
 
-plot(x = antherPoll$anthx.1, y = antherPoll$anthy.1)
-plot(antherPoll$anthx.1)
-
-
-
-
-
-
-
-# smooth with SG is based on the least-squares fitting of 
-# polynomials to segments of the data
-
-# other options include smoothing splines (tend to "cut the corners" of curves)
-# butterworth filters (inaccurate at endpoints)
-# Kernel smoothing
-
-x <- na.omit(antherPoll$poly.1)
-sg <- sgolayfilt(x, p = 3, n = 11) # Savitzky-Golay filter
-plot(x, type="b", col = 'red', pch = 20)
-lines(sg, pch = 20, type = 'l') # smoothed SG data
-# interpolation
-inn = interp1(x = 1:length(x), xi = seq(1, length(x), length.out = 500), y = sg, method = "cubic")
-lines(inn, col = 'pink', x = seq(1, length(x), length.out = 500), pch = 20, type = 'b')
-
-# look at residuals
-plot(x - sg, type = 'b')
-abline(h = 0, lty = 2)
-
-# calculate run lengths (bias)
-rrll = rle(x - sg > 0)
-mean(rrll$lengths)
-hist(log(rrll$lengths))
+# anther speed
+ggplot(newDF, aes(x = centeredTime, y = anthSpeed, group = trial)) + 
+     geom_line(alpha = 0.5) +
+     xlim(c(-0.01, 0.02)) + 
+     ylim(c(0,6)) + 
+     labs(x = "Time (s)", y = "Anther speed (m/s)")
+ggsave(paste0(savePath, "antherSpeed1.pdf"), width = 5, height = 4)
 
 
-# evaluate bias
-# want to minimize long runs with high distance from line 
-## HERE -- add up distance from line in runs
-aa <- numeric()
-bb = numeric()
-cc = numeric()
-dd= numeric()
-xx = seq(5, 91, by = 2)
-for(ii in xx){
-     x <- na.omit(antherPoll$poly.1)
-     sg <- sgolayfilt(x, p = 3, n = ii) # Savitzky-Golay filter
-     # calculate run lengths (bias)
-     rrll = rle(x - sg > 0)
-     aa <- c(aa, mean(log(rrll$lengths)))
+# pollen speed
+ggplot(newDF, aes(x = centeredTime, y = polSpeed, group = trial)) + 
+     geom_line(alpha = 0.5) + 
+     xlim(c(-0.01, 0.02)) +
+     ylim(c(0,6)) +  
+     labs(x = "Time (s)", y = "Pollen speed (m/s)")
+ggsave(paste0(savePath, "pollenSpeed1.pdf"), width = 5, height = 4)
+
+# anther tangential acceleration
+ggplot(newDF, aes(x = centeredTime, y = a_T_anth, group = trial)) + 
+     geom_line(alpha = 0.5) + 
+     #ylim(c(-2500, 4000)) +
+     xlim(c(-0.01, 0.02)) + 
+     labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)")
+ggsave(paste0(savePath, "antherTangAccel1.pdf"), width = 5, height = 4)
+
+# pollen tangential acceleration
+# anther tangential acceleration
+ggplot(newDF, aes(x = centeredTime, y = a_T_Pol, group = trial)) + 
+     geom_line(alpha = 0.5) + 
+     #ylim(c(-2500, 4000)) +
+     xlim(c(-0.01, 0.02)) + 
+     labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)")
+ggsave(paste0(savePath, "PollenTangAccel1.pdf"), width = 5, height = 4)
+
+# find max for each measurement for each trial
+
+# anther speed
+mmx <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
+     tmp <- newDF[newDF$trial == x, ]
+     return (unlist(tmp[which.max(tmp$anthSpeed),]))
+})))
+mmx$trial <- row.names(mmx)
+
+
+ggplot() + 
+     geom_line(data = newDF, aes(x = centeredTime, y = anthSpeed, group = as.factor(trial)), alpha = 0.5) +
+     xlim(c(-0.01, 0.02)) + 
+     ylim(c(0,6)) + 
+     labs(x = "Time (s)", y = "Anther speed (m/s)") + 
+     geom_point(data = mmx, aes(x = centeredTime, y = anthSpeed), color = 'red', alpha = 0.5) + 
+     theme(legend.position = "none") 
+#+  facet_wrap(~ trial)
+ggsave(paste0(savePath, "antherSpeedMax1.pdf"), width = 5, height = 4)
+
+
+# pollen speed
+mmp <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
+     tmp <- newDF[newDF$trial == x, ]
+     tmp <- tmp[abs(tmp$centeredTime) < 0.01, ]
+     return (unlist(tmp[which.max(tmp$polSpeed),]))
+})))
+
+mmp$trial <- row.names(mmp)
+
+# pollen speed
+ggplot() + 
+     geom_line(data = newDF, aes(x = centeredTime, y = polSpeed, group = trial), alpha = 0.5) + 
+     xlim(c(-0.01, 0.02)) + 
+     ylim(c(0,6)) + 
+     labs(x = "Time (s)", y = "Pollen speed (m/s)") + 
+     geom_point(data = mmp, aes(x = centeredTime, y = polSpeed), color = 'red', alpha = 0.5) + 
+     theme(legend.position = "none") 
+ggsave(paste0(savePath, "pollenSpeedMax1.pdf"), width = 5, height = 4)
      
-     bb <- c(bb, sd(sg - smooth.spline(x)$y))
-     cc <- c(cc, sqrt(1 / length(x) * sum((x - sg)^2))) # Root mean squared error
-     dd <- c(dd, mad(x - sg))
+
+
+# anther acceleration
+mma <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
+     tmp <- newDF[newDF$trial == x, ]
      
-}
-plot(y = aa, xx)
-abline(v = 11)
-plot(y = bb, xx)
-abline(v = 11)
-plot(y = cc, xx)
-abline(v = 11)
-plot(y = dd, xx)
-abline(v = 11)
+     # get only points that are within 0.05 seconds of the centered time
+     # to ignore the anthers hitting the other side of the flower
+     tmp <- tmp[abs(tmp$centeredTime) < 0.005, ]
+     return (unlist(tmp[which.max(tmp$a_T_anth),]))
+})))
+
+mma$trial <- row.names(mma)
+
+ggplot() + 
+     geom_line(data = newDF, aes(x = centeredTime, y = a_T_anth, group = trial), alpha = 0.5) + 
+     #ylim(c(-2500, 4000)) +
+     xlim(c(-0.01, 0.02)) + 
+     labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)") + 
+     geom_point(data = mma, aes(x = centeredTime, y = a_T_anth), color = 'red', alpha = 0.5)
+ggsave(paste0(savePath, "antherTangAccelMax1.pdf"), width = 5, height = 4)
 
 
-cumsum(rrll$lengths)
+# pollen acceleration
+mmpp <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
+     tmp <- newDF[newDF$trial == x, ]
+     tmp <- tmp[abs(tmp$centeredTime) < 0.007, ]
+     return (unlist(tmp[which.max(tmp$a_T_Pol),]))
+})))
+
+mmpp$trial <- row.names(mmpp)
+
+ggplot() + 
+     geom_line(data = newDF, aes(x = centeredTime, y = a_T_Pol, group = trial), alpha = 0.5) + 
+     #ylim(c(-2500, 4000)) +
+     xlim(c(-0.01, 0.02)) + 
+     labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)") + 
+     geom_point(data = mmpp, aes(x = centeredTime, y = a_T_Pol), color = 'red', alpha = 0.5)
+
+ggsave(paste0(savePath, "pollenTangAccelMax1.pdf"), width = 5, height = 4)
 
 
-# interpolation of raw data
-inn = interp1(x = 1:length(x), xi = seq(1, length(x), length.out = 500), y = x, method = "cubic")
-lines(inn, col = 'grey', x = seq(1, length(x), length.out = 500), pch = 20, type = 'b')
+# estimate ranges for acceleration, and speed
+md  = merge(x = mmx[, c('trial', 'anthSpeed')], metDat, by.x = "trial", by.y = 
+                 "VideoName")
+md = merge(x = mmp[, c('trial', 'polSpeed')], md, by = "trial")
+
+md = merge(x = mmpp[, c('trial', 'a_T_Pol')], md, by = "trial")
+md = merge(x = mma[, c('trial', 'a_T_anth')], md, by = "trial")
 
 
-# filter with Savitzky-Golay filter
-# degree = 3, frame size = 11 points
-foo = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(x){
-     sm1 <- sgolayfilt(na.omit(antherPoll[, x]), p = 3, n = 11) 
-     antherPoll[, x][complete.cases(antherPoll[, x])] <<- sm1
-})
-plot(x = antherPoll$anthx.1, y = antherPoll$anthy.1)
-plot(x = antherPoll$anthx, y = antherPoll$anthy)
+#LMER
 
-plot( antherPoll$anthx)
-points(antherPoll$anthx.1, pch = 20)
-plot( antherPoll$anthy)
-points(antherPoll$anthy.1, pch = 20)
+modVelMaxAnth <- lmer(formula = anthSpeed ~ (1|plant/FlowerNumber), data = md)
+summary(modVelMaxAnth)
+confint(modVelMaxAnth)
+plot(modVelMaxAnth)
 
+modVelMaxPol <- lmer(formula = polSpeed ~ (1|plant/FlowerNumber), data = md)
+summary(modVelMaxPol)
+confint(modVelMaxPol)
+plot(modVelMaxPol)
 
-# recently smoothed data
-plot(antherPoll$poly.1, col = 'blue')
+modAccMaxPol <- lmer(formula = a_T_Pol ~ (1|plant/FlowerNumber), data = md)
+summary(modAccMaxPol)
+confint(modAccMaxPol)
+plot(modAccMaxPol)
 
-
-
-# interpolation
-inn = interp1(x = 1:length(x), xi = seq(1, length(x), by = 0.1), y = sg, method = "cubic")
-lines(inn, col = 'pink', x = seq(1, length(x), by = 0.1), pch = 20, type = 'b')
-length(x)
-length(inn)
+modAccMaxAnth <- lmer(formula = a_T_anth ~ (1|plant/FlowerNumber), data = md)
+summary(modAccMaxAnth)
+confint(modAccMaxAnth)
+plot(modAccMaxAnth)
 
 
-# look at residuals
-plot(x - sg, type = 'b')
-plot(x - na.omit(antherPoll$poly.1), type = 'b')
-abline(h = 0, lty = 2)
 
-plot(y = x, x = 1:length(x))
+
+

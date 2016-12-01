@@ -181,3 +181,34 @@ df1
 # Questions for Stacey:
 # Do people report magnitude of acceleration by combining X and Y
 # or do they report tangential and normal acceleration separately?
+
+
+
+# BUtterworth filtering
+library(signal)
+n <- 100
+x <- 1:n
+y <- ifelse(0.3*n < x & x < 0.7*n, 1, 0)
+par(mar=c(3, 3, 1, 1), mgp=c(2, 0.7, 0))
+plot(x, y, type='o', pch=20, ylim=c(-0.1, 1.1))
+W <- 0.5 # 1/2 the nyquist frequency
+b1 <- butter(1, W)
+y1 <- filtfilt(b1, y)
+points(x, y1, type='o', pch=20, col='red')
+
+b2 <- butter(2, W)
+y2 <- filtfilt(b2, y)
+points(x, y2, type='o', pch=20, col='blue')
+
+b3 <- butter(5, W)
+y3 <- filtfilt(b3, y)
+points(x, y3, type='o', pch=20, col='forestgreen')
+
+
+sg <- sgolayfilt(y, p = 1, n = 41) # Savitzky-Golay filter
+plot(y, type="b", col = 'red', pch = 20)
+lines(sg, pch = 20, type = 'l') # smoothed SG data
+
+legend("topright", lwd=2, pch=20, 
+       col=c("black", "red", "blue", "forestgreen"),
+       legend=c("Signal", "Order 1", "Order 2", "Order 3"))

@@ -128,7 +128,7 @@ for(ii in 1:nrow(metDat)){
           x <- na.omit(antherPoll[, y])
           xx <- c(x[round(length(x)/ 2):1], x, x[round(length(x)):round(length(x)/ 2)])
           want = c(rep(FALSE, round(length(x)/ 2)), rep(TRUE, length(x)), rep(FALSE, round(length(x)/2)))
-          W = 0.07 # sweet spot seems to be about 0.2
+          W = 0.2 # sweet spot seems to be about 0.2
           b1 <- butter(5, W, type = 'low')
           y1 <- filtfilt(b1, xx)
           sm1 <- y1[want]
@@ -304,7 +304,7 @@ ggplot(newDF, aes(x = centeredTime, y = anthSpeed, group = trial)) +
      xlim(c(-0.01, 0.02)) + 
      ylim(c(0,6)) + 
      labs(x = "Time (s)", y = "Anther speed (m/s)")
-ggsave(paste0(savePath, "antherSpeed1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherSpeed01.pdf"), width = 5, height = 4)
 
 
 # pollen speed
@@ -313,7 +313,7 @@ ggplot(newDF, aes(x = centeredTime, y = polSpeed, group = trial)) +
      xlim(c(-0.01, 0.02)) +
      ylim(c(0,6)) +  
      labs(x = "Time (s)", y = "Pollen speed (m/s)")
-ggsave(paste0(savePath, "pollenSpeed1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "pollenSpeed01.pdf"), width = 5, height = 4)
 
 # anther tangential acceleration
 ggplot(newDF, aes(x = centeredTime, y = a_T_anth, group = trial)) + 
@@ -321,7 +321,7 @@ ggplot(newDF, aes(x = centeredTime, y = a_T_anth, group = trial)) +
      #ylim(c(-2500, 4000)) +
      xlim(c(-0.01, 0.02)) + 
      labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)")
-ggsave(paste0(savePath, "antherTangAccel1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherTangAccel01.pdf"), width = 5, height = 4)
 
 # pollen tangential acceleration
 # anther tangential acceleration
@@ -330,7 +330,7 @@ ggplot(newDF, aes(x = centeredTime, y = a_T_Pol, group = trial)) +
      #ylim(c(-2500, 4000)) +
      xlim(c(-0.01, 0.02)) + 
      labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)")
-ggsave(paste0(savePath, "PollenTangAccel1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "PollenTangAccel01.pdf"), width = 5, height = 4)
 
 # find max for each measurement for each trial
 
@@ -350,7 +350,7 @@ ggplot() +
      geom_point(data = mmx, aes(x = centeredTime, y = anthSpeed), color = 'red', alpha = 0.5) + 
      theme(legend.position = "none") 
 #+  facet_wrap(~ trial)
-ggsave(paste0(savePath, "antherSpeedMax1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherSpeedMax01.pdf"), width = 5, height = 4)
 
 
 # pollen speed
@@ -370,7 +370,7 @@ ggplot() +
      labs(x = "Time (s)", y = "Pollen speed (m/s)") + 
      geom_point(data = mmp, aes(x = centeredTime, y = polSpeed), color = 'red', alpha = 0.5) + 
      theme(legend.position = "none") 
-ggsave(paste0(savePath, "pollenSpeedMax1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "pollenSpeedMax01.pdf"), width = 5, height = 4)
      
 
 
@@ -392,7 +392,7 @@ ggplot() +
      xlim(c(-0.01, 0.02)) + 
      labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)") + 
      geom_point(data = mma, aes(x = centeredTime, y = a_T_anth), color = 'red', alpha = 0.5)
-ggsave(paste0(savePath, "antherTangAccelMax1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherTangAccelMax01.pdf"), width = 5, height = 4)
 
 
 # pollen acceleration
@@ -411,7 +411,7 @@ ggplot() +
      labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)") + 
      geom_point(data = mmpp, aes(x = centeredTime, y = a_T_Pol), color = 'red', alpha = 0.5)
 
-ggsave(paste0(savePath, "pollenTangAccelMax1.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "pollenTangAccelMax01.pdf"), width = 5, height = 4)
 
 
 # estimate ranges for acceleration, and speed

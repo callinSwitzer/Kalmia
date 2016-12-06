@@ -111,7 +111,7 @@ for(kk in seq(from = 0.9, to = 0.05, by = -0.05)){
           # points(sg[want], pch = 20, type = 'o') # smoothed SG data
           
           
-          W = 0.1
+          W = 0.99
           b1 <- butter(5, W, type = 'low')
           y1 <- filtfilt(b1, xx)
           
@@ -295,7 +295,23 @@ for(kk in seq(from = 0.9, to = 0.05, by = -0.05)){
           print(ii)
           
      }
-     
+
+
+antherPoll$frame <- 1:nrow(antherPoll)
+ggplot(na.omit(antherPoll)) + 
+     geom_point(aes(x = anthx, y = anthy), colour = "grey", alpha = 0.3) + 
+     geom_path(aes(x = anthx, y = anthy), color = "grey", alpha = 0.3) + 
+     geom_point(aes(x = anthx.1, y = anthy.1, colour = frame)) + 
+     geom_path(aes(x = anthx.1, y = anthy.1, color = frame)) + 
+     scale_color_viridis()
+
+ggplot((antherPoll)) + 
+     geom_point(aes(x = polx, y = poly), colour = "grey", alpha = 0.3) + 
+     geom_path(aes(x = polx, y = poly), color = "grey", alpha = 0.3) + 
+     geom_point(aes(x = polx.1, y = poly.1, colour = frame)) + 
+     geom_path(aes(x = polx.1, y = poly.1, color = frame)) + 
+     scale_color_viridis() + 
+     coord_fixed(ratio = 1)
 
 plot(antherPoll$anthx, antherPoll$anthy)
 points(antherPoll$anthx.1, antherPoll$anthy.1, type = 'b', pch = 20)

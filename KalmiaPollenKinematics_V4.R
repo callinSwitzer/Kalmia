@@ -388,11 +388,23 @@ md = merge(x = mma[, c('trial', 'a_T_anth')], md, by = "trial")
 
 
 #LMER
-
-modVelMaxAnth <- lmer(formula = anthSpeed ~ (1|plant/FlowerNumber), data = md)
+hist(md$anthSpeed) #dist is fine
+modVelMaxAnth <- lmer(formula = anthSpeed ~  (1|plant/FlowerNumber), data = md)
 summary(modVelMaxAnth)
 confint(modVelMaxAnth)
+
+# diagnostics
 plot(modVelMaxAnth)
+
+# QQPlot for group-level effects
+qqnorm(ranef(modVelMaxAnth)$plant[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(modVelMaxAnth)$plant[[1]])
+
+# QQPlot for group-level effects
+qqnorm(ranef(modVelMaxAnth)$FlowerNumber[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(modVelMaxAnth)$FlowerNumber[[1]]) # 
+
+
 
 modVelMaxPol <- lmer(formula = polSpeed ~ (1|plant/FlowerNumber), data = md)
 summary(modVelMaxPol)
@@ -401,7 +413,9 @@ plot(modVelMaxPol)
 
 
 # log transformed, b/c distribution is skewed.
-modAccMaxPol <- lmer(formula = log(a_T_Pol) ~ (1|plant/FlowerNumber), data = md)
+hist(md$a_T_Pol)
+hist(log(md$a_T_Pol)) #better
+modAccMaxPol <- lmer(formula = log(a_T_Pol) ~  (1|plant/FlowerNumber), data = md)
 summary(modAccMaxPol)
 exp(confint(modAccMaxPol))
 plot(modAccMaxPol)
@@ -410,4 +424,14 @@ modAccMaxAnth <- lmer(formula = log(a_T_anth) ~ (1|plant/FlowerNumber), data = m
 summary(modAccMaxAnth)
 exp(confint(modAccMaxAnth))
 plot(modAccMaxAnth)
+# diagnostics
+plot(modAccMaxAnth)
+
+# QQPlot for group-level effects
+qqnorm(ranef(modAccMaxAnth)$plant[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(modAccMaxAnth)$plant[[1]])
+
+# QQPlot for group-level effects
+qqnorm(ranef(modAccMaxAnth)$FlowerNumber[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(modAccMaxAnth)$FlowerNumber[[1]]) # 
 

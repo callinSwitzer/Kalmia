@@ -46,7 +46,7 @@ newDF <- data.frame()
 for(ii in 1:nrow(metDat)){
      
      ddfile <- paste0(digdirect, metDat$redigitizedFile[ii])
-     
+     #ddfile <- paste0(digdirect, "20150611_120046xypts.csv")
      dp <- read.csv(ddfile)
      
      # calibrate locations, based on digitized pin or other object
@@ -63,6 +63,7 @@ for(ii in 1:nrow(metDat)){
      # get anther and pollen locations
      antherPoll <- data.frame(anthx = dp$pt3_cam1_X, anthy= dp$pt3_cam1_Y, 
                               polx = dp$pt4_cam1_X, poly= dp$pt4_cam1_Y)
+     
      
      # get frame where pollen starts and leaves
      antherPoll$polStart = 1:nrow(antherPoll) == metDat$framePollenStartedLeaving[ii]
@@ -119,7 +120,12 @@ for(ii in 1:nrow(metDat)){
      antherPoll$anthspeed = sqrt(antherPoll$anthx.1.abs.vel^2 + antherPoll$anthy.1.abs.vel^2)
      antherPoll$polspeed = sqrt(antherPoll$polx.1.abs.vel^2 + antherPoll$poly.1.abs.vel^2)
      
-     # plot(antherPoll$anthspeed)
+     # plot(antherPoll$anthspeed, type = 'l')
+     
+     # plot(antherPoll$anthx.1, antherPoll$anthy.1)
+     # points(antherPoll$anthx, antherPoll$anthy, pch = 20)
+     # plot(antherPoll$anthx)
+     # plot(antherPoll$anthy)
      
      ###########################################
      # pollen acceleration
@@ -328,7 +334,7 @@ ggplot() +
      geom_point(data = mmp, aes(x = centeredTime, y = polSpeed), color = 'red', alpha = 0.5) + 
      theme(legend.position = "none") 
 ggsave(paste0(savePath, "pollenSpeedMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
-     
+
 
 
 # anther acceleration
@@ -337,7 +343,7 @@ mma <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(
      
      # get only points that are within 0.05 seconds of the centered time
      # to ignore the anthers hitting the other side of the flower
-     tmp <- tmp[abs(tmp$centeredTime) < 0.002, ]
+     #tmp <- tmp[abs(tmp$centeredTime) < 0.002, ]
      return (unlist(tmp[which.max(tmp$a_T_anth),]))
 })))
 
@@ -348,7 +354,7 @@ ggplot() +
      #ylim(c(-2500, 4000)) +
      xlim(c(-0.01, 0.02)) + 
      labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)") + 
-     geom_point(data = mma, aes(x = centeredTime, y = a_T_anth), color = 'red', alpha = 0.5) 
+     geom_point(data = mma, aes(x = centeredTime, y = a_T_anth), color = 'red', alpha = 0.5)
 
 ggsave(paste0(savePath, "antherTangAccelMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
@@ -356,7 +362,7 @@ ggsave(paste0(savePath, "antherTangAccelMax01_CVSmoothSpline.pdf"), width = 5, h
 # pollen acceleration
 mmpp <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
      tmp <- newDF[newDF$trial == x, ]
-     tmp <- tmp[abs(tmp$centeredTime) < 0.003, ]
+     #tmp <- tmp[abs(tmp$centeredTime) < 0.003, ]
      return (unlist(tmp[which.max(tmp$a_T_Pol),]))
 })))
 

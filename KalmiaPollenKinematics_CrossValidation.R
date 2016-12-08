@@ -125,7 +125,7 @@ for(ii in 1:nrow(metDat)){
 hist(bestSmthAnth)
 abline(v = mean(bestSmthAnth))
 mean(bestSmthAnth) # 0.26225
-median(bestSmthAnth) #,0.296,  maybe go with median, since the dist is skewed
+median(bestSmthAnth) #,0.291,  maybe go with median, since the dist is skewed
 
 ### END OF 10-fold CV for anthers
 
@@ -208,7 +208,7 @@ for(ii in 1:nrow(metDat)){
 hist(bestSmthPol)
 abline(v = mean(bestSmthPol)) # 
 median(bestSmthPol) # 0.286, maybe go with median, since the dist is skewed
-mean(bestSmthPol)#  0.256625
+mean(bestSmthPol)#  0.25725
 
 
 # Decision: smoothing parameter is between 0.286 and 0.296 -- go with 0.29

@@ -2,19 +2,13 @@
 ## 29 Nov 2016
 ## 6 Dec 2016 Update -- re-digitized pollen and anthers very carefully
 ## may not need any smoothing
+## 8 Dec Update: used cross validation for decide smoothing parameter for smoothing spline
+
 ## Kalmia pollen and anther kinematics
 
 # 1. Read in digitized files
-# 2. Smooth digitized points, and impute
-# 3. Use imputed points to calculate velocity and acceleration (normal and tangential)
-# 4. 
-
-
-## TODO:
-# use cross-validation to decide smoothing parameters or plot noise/resoluation tradeoff
-# or simply justify the choice -- by using visual inspection
-# compute acceleration and velocity for different values of smoothing parameters
-# idea -- show video with smoothed vs. unsmoothed points added -- background subtracted.
+# 2. Smooth digitized points, using smoothing spline with tuning parameter from cross validation
+# 3. Use smoothed points to calculate velocity and acceleration (normal and tangential)
 
 
 
@@ -50,10 +44,6 @@ digdirect <- "/Users/callinswitzer/Dropbox/ExperSummer2015/CleanKalmiaDigitized/
 newDF <- data.frame()
 
 for(ii in 1:nrow(metDat)){
-     
-     
-     # ignore ii ==7, because the video started too late
-     #if(ii == 7) next
      
      ddfile <- paste0(digdirect, metDat$redigitizedFile[ii])
      
@@ -93,49 +83,14 @@ for(ii in 1:nrow(metDat)){
      # cbind data frame, to add smoothed columns
      antherPoll <- data.frame(cbind(antherPoll, antherPoll))
      
-     # plot(x = antherPoll$anthx.1, y = antherPoll$anthy.1)
-     # plot(antherPoll$anthx.1)
-     
-     # smooth with SG is based on the least-squares fitting of 
-     # polynomials to segments of the data
-     
-     # other options include smoothing splines (tend to "cut the corners" of curves)
-     # butterworth filters (inaccurate at endpoints)
-     # Kernel smoothing
-     
-     x <- na.omit(antherPoll$anthy.1)
-     xx <- c(x[round(length(x)/ 2):1], x, x[round(length(x)):round(length(x)/ 2)])
-     want = c(rep(FALSE, round(length(x)/ 2)), rep(TRUE, length(x)), rep(FALSE, round(length(x)/2)))
-     sg <- sgolayfilt(xx, p = 3, n = 11) # Savitzky-Golay filter
-     # plot(xx[want], type="b", col = 'red', pch = 20)
-     # points(sg[want], pch = 20, type = 'o') # smoothed SG data
-     
-     
-     W = 0.4
-     b1 <- butter(5, W, type = 'low')
-     y1 <- filtfilt(b1, xx)
-     
-     # points(y1[want], pch=20, col='grey')
-     
-     
-     
-     
-     
-     # filter with Savitzky-Golay filter or Butterworth filter
-     # # degree = 3, frame size = 11 points
-     # foo = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(y){
-     #      #sm1 <- sgolayfilt(na.omit(antherPoll[, y]), p = 3, n = 11) 
-     #      
-     #      # # butterworth filter
-     #      x <- na.omit(antherPoll[, y])
-     #      xx <- c(x[round(length(x)/ 2):1], x, x[round(length(x)):round(length(x)/ 2)])
-     #      want = c(rep(FALSE, round(length(x)/ 2)), rep(TRUE, length(x)), rep(FALSE, round(length(x)/2)))
-     #      W = 0.4 # sweet spot seems to be about 0.2
-     #      b1 <- butter(5, W, type = 'low')
-     #      y1 <- filtfilt(b1, xx)
-     #      sm1 <- y1[want]
-     #      antherPoll[, y][complete.cases(antherPoll[, y])] <<- sm1
-     # })
+     # smooth with a smoothing spline, spar = 0.29
+     foo = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(y){
+          yy = na.omit(antherPoll[, y])
+          xx = 1:length(yy)
+          
+          sm1 <- smooth.spline(x = xx, y = yy, spar = 0.29)
+          antherPoll[, y][complete.cases(antherPoll[, y])] <<- sm1$y
+     })
      
      # add time to data frame
      antherPoll$tme = 0: (nrow(antherPoll) - 1) / fps # time
@@ -306,7 +261,7 @@ ggplot(newDF, aes(x = centeredTime, y = anthSpeed, group = trial)) +
      xlim(c(-0.01, 0.02)) + 
      ylim(c(0,6)) + 
      labs(x = "Time (s)", y = "Anther speed (m/s)")
-ggsave(paste0(savePath, "antherSpeed01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherSpeed01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
 
 # pollen speed
@@ -315,7 +270,7 @@ ggplot(newDF, aes(x = centeredTime, y = polSpeed, group = trial)) +
      xlim(c(-0.01, 0.02)) +
      ylim(c(0,6)) +  
      labs(x = "Time (s)", y = "Pollen speed (m/s)")
-ggsave(paste0(savePath, "pollenSpeed01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "pollenSpeed01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
 # anther tangential acceleration
 ggplot(newDF, aes(x = centeredTime, y = a_T_anth, group = trial)) + 
@@ -323,7 +278,7 @@ ggplot(newDF, aes(x = centeredTime, y = a_T_anth, group = trial)) +
      #ylim(c(-2500, 4000)) +
      xlim(c(-0.01, 0.02)) + 
      labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)")
-ggsave(paste0(savePath, "antherTangAccel01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherTangAccel01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
 # pollen tangential acceleration
 # anther tangential acceleration
@@ -332,7 +287,7 @@ ggplot(newDF, aes(x = centeredTime, y = a_T_Pol, group = trial)) +
      #ylim(c(-2500, 4000)) +
      xlim(c(-0.01, 0.02)) + 
      labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)")
-ggsave(paste0(savePath, "PollenTangAccel01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "PollenTangAccel01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
 # find max for each measurement for each trial
 
@@ -352,7 +307,7 @@ ggplot() +
      geom_point(data = mmx, aes(x = centeredTime, y = anthSpeed), color = 'red', alpha = 0.5) + 
      theme(legend.position = "none") 
 #+  facet_wrap(~ trial)
-ggsave(paste0(savePath, "antherSpeedMax01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherSpeedMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
 
 # pollen speed
@@ -372,7 +327,7 @@ ggplot() +
      labs(x = "Time (s)", y = "Pollen speed (m/s)") + 
      geom_point(data = mmp, aes(x = centeredTime, y = polSpeed), color = 'red', alpha = 0.5) + 
      theme(legend.position = "none") 
-ggsave(paste0(savePath, "pollenSpeedMax01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "pollenSpeedMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
      
 
 
@@ -395,7 +350,7 @@ ggplot() +
      labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)") + 
      geom_point(data = mma, aes(x = centeredTime, y = a_T_anth), color = 'red', alpha = 0.5) 
 
-ggsave(paste0(savePath, "antherTangAccelMax01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "antherTangAccelMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
 
 # pollen acceleration
@@ -414,7 +369,7 @@ ggplot() +
      labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)") + 
      geom_point(data = mmpp, aes(x = centeredTime, y = a_T_Pol), color = 'red', alpha = 0.5)
 
-ggsave(paste0(savePath, "pollenTangAccelMax01_cleaned_NOFilt.pdf"), width = 5, height = 4)
+ggsave(paste0(savePath, "pollenTangAccelMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
 
 
 # estimate ranges for acceleration, and speed
@@ -438,17 +393,15 @@ summary(modVelMaxPol)
 confint(modVelMaxPol)
 plot(modVelMaxPol)
 
-modAccMaxPol <- lmer(formula = a_T_Pol ~ (1|plant/FlowerNumber), data = md)
+
+# log transformed, b/c distribution is skewed.
+modAccMaxPol <- lmer(formula = log(a_T_Pol) ~ (1|plant/FlowerNumber), data = md)
 summary(modAccMaxPol)
-confint(modAccMaxPol)
+exp(confint(modAccMaxPol))
 plot(modAccMaxPol)
 
-modAccMaxAnth <- lmer(formula = a_T_anth ~ (1|plant/FlowerNumber), data = md)
+modAccMaxAnth <- lmer(formula = log(a_T_anth) ~ (1|plant/FlowerNumber), data = md)
 summary(modAccMaxAnth)
-confint(modAccMaxAnth)
+exp(confint(modAccMaxAnth))
 plot(modAccMaxAnth)
-
-
-
-
 

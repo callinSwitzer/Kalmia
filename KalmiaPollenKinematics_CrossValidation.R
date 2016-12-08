@@ -124,7 +124,7 @@ for(ii in 1:nrow(metDat)){
 
 hist(bestSmthAnth)
 abline(v = mean(bestSmthAnth))
-mean(bestSmthAnth) # 0.26225
+mean(bestSmthAnth) 
 median(bestSmthAnth) #,0.291,  maybe go with median, since the dist is skewed
 
 ### END OF 10-fold CV for anthers

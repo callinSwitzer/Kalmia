@@ -37,7 +37,7 @@ discRows = grep(pattern = 'discard',
 beh = beh[-discRows, ]
 
 # remove lab views with captive bees
-beh_field <-beh[beh$vid.type == 'field',]
+beh_field <-beh[beh$`vid type` == 'field',]
 
 
 # visualize diversity of pollinators
@@ -49,6 +49,7 @@ beh_field <- within(beh_field,
                     pollinatorClass <- factor(pollinatorClass, 
                             levels=names(sort(table(pollinatorClass), 
                                               decreasing=TRUE))))
+nrow(beh_field)
 quartz()
 ggplot(beh_field, aes(x = pollinatorClass)) + 
      geom_bar() + 

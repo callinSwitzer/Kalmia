@@ -1,3 +1,14 @@
+---
+title: "Kalmia Pollen Kinematic Analysis: Max speed and acceleration"
+author: "Callin Switzer"
+date: "February 8, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 ## Callin Switzer
 ## 29 Nov 2016
 ## 6 Dec 2016 Update -- re-digitized pollen and anthers very carefully
@@ -13,7 +24,7 @@
 # 3. Use smoothed points to calculate velocity and acceleration (normal and tangential)
 
 
-
+```{r}
 # Setup
 ipak <- function(pkg){
      new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
@@ -25,16 +36,16 @@ packages <- c("ggplot2", "scales", "multcomp", "plyr", "car", "lme4", "signal")
 
 ipak(packages)
 
-
 # read in metadata
-dfile <- "/Users/callinswitzer/Dropbox/ExperSummer2015/LaurelsOnly.csv"
+dfile <- "/Users/callinswitzer/Dropbox/ExperSummer2016/
+Kalmia/Manuscript/DatasetsSupplemental/LaurelsOnly.csv"
 metDat <- read.csv(dfile)
 
 metDat <- metDat[metDat$redigitizedFile!= "", ]
 
 # set constants:
 fps <- 5000 # frames per second
-
+```
 ii = 11
 
 

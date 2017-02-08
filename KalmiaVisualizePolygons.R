@@ -7,6 +7,8 @@ library(gsheet)
 # KalmiaAndDeadBees
 kds <- gsheet2tbl("https://docs.google.com/spreadsheets/d/17YTmbErH53yR0AYLfwWCmTocqcrqLQFqfj2e8kT-pig/edit?usp=sharing")
 
+unique(kds$FlowerAccNum)
+
 # directory where the polygon files are found
 setwd('/Users/callinswitzer/Dropbox/KalmiaProject/KalmiaExamples/KalmiaManualTrig_VidsToProcess/')
 

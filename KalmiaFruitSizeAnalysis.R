@@ -2,6 +2,7 @@
 # Using fruit sizes calculated from image segmentation in Python with opencv
 #  Callin Switzer
 # 20 October 2016
+# 8 Feb 2017 Update: Conducted Statistical Modeling with LMER and GLMER
 
 
 
@@ -25,6 +26,8 @@ kfrt <- gsheet2tbl(URL)
 
 # clean and process data
 kfrt <- kfrt[kfrt$dia_mm != 20.0, ]
+
+nrow(kfrt)
 
 kfrt$trt <- sapply(X = 1:nrow(kfrt), FUN = function(x) strsplit(kfrt$plantNum[x], split = "__")[[1]][2])
 kfrt$accessNum <- sapply(X = 1:nrow(kfrt), FUN = function(x) strsplit(kfrt$plantNum[x], split = "__")[[1]][1])

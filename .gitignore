@@ -6,6 +6,7 @@
 
 # Rproject stu
 .Rproj.user
+.Rproj*
 
 */.Rproj.user/*
 .Rhistory

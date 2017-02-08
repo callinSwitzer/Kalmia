@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+<pre>
 ## Callin Switzer
 ## 29 Nov 2016
 ## 6 Dec 2016 Update -- re-digitized pollen and anthers very carefully
@@ -19,13 +20,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ## Kalmia pollen and anther kinematics
-# 1. Read in digitized files
-# 2. Smooth digitized points, using smoothing spline with tuning parameter from cross validation
-# 3. Use smoothed points to calculate velocity and acceleration (normal and tangential)
+### 1. Read in digitized files
+### 2. Smooth digitized points, using smoothing spline with tuning parameter from cross validation
+### 3. Use smoothed points to calculate velocity and acceleration (normal and tangential)
+
+</pre>
 
 
-```{r}
-# Setup
+# Install packages
+```{r, warning=FALSE, message = FALSE}
 ipak <- function(pkg){
      new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
      if(length(new.pkg)) install.packages(new.pkg, dependencies = TRUE)
@@ -33,33 +36,43 @@ ipak <- function(pkg){
 }
 
 packages <- c("ggplot2", "scales", "multcomp", "plyr", "car", "lme4", "signal")
-
 ipak(packages)
 
+# print session info and time the code was run last
+Sys.time()
+sessionInfo()
+```
+
+# Read in data
+```{r}
+# set directory that contains datasets
+dataDirectory = '/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/DatasetsSupplemental/'
+
 # read in metadata
-dfile <- "/Users/callinswitzer/Dropbox/ExperSummer2016/
-Kalmia/Manuscript/DatasetsSupplemental/LaurelsOnly.csv"
-metDat <- read.csv(dfile)
+dfile <- "LaurelsOnly.csv"
+metDat <- read.csv(paste0(dataDirectory, dfile))
 
 metDat <- metDat[metDat$redigitizedFile!= "", ]
 
 # set constants:
 fps <- 5000 # frames per second
 ```
-ii = 11
 
 
+
+# Read in digitized files (xypts)
+# Smooth xypts
+# Calculate pollen and anther acceleration and velocity
+Note: The smoothing parameter was chosen with 10-fold CV
+```{r, cache = TRUE}
 # read in each .csv file for analysis
-# make a list of data frames
-digdirect <- "/Users/callinswitzer/Dropbox/ExperSummer2015/CleanKalmiaDigitized/"
-
+digdirect <- "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/DatasetsSupplemental/CleanKalmiaDigitized/"
 
 newDF <- data.frame()
 
 for(ii in 1:nrow(metDat)){
      
      ddfile <- paste0(digdirect, metDat$redigitizedFile[ii])
-     #ddfile <- paste0(digdirect, "20150611_120046xypts.csv")
      dp <- read.csv(ddfile)
      
      # calibrate locations, based on digitized pin or other object
@@ -97,7 +110,8 @@ for(ii in 1:nrow(metDat)){
      # cbind data frame, to add smoothed columns
      antherPoll <- data.frame(cbind(antherPoll, antherPoll))
      
-     # smooth with a smoothing spline, spar = 0.29
+     # smooth with a smoothing spline, spar = 0.29 -- this smoothing
+     # spline was chosen through cross validation
      foo = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(y){
           yy = na.omit(antherPoll[, y])
           xx = 1:length(yy)
@@ -118,8 +132,6 @@ for(ii in 1:nrow(metDat)){
           #antherPoll[,newName] <<- tmp - min(na.omit(tmp))
      })
      
-     
-     
      # add columns to show velocity, based on smoothed, absolute position
      # velocity is in m/s
      bat = sapply(X = c("anthx.1.abs", "anthy.1.abs", "polx.1.abs", "poly.1.abs"), 
@@ -133,13 +145,6 @@ for(ii in 1:nrow(metDat)){
      antherPoll$anthspeed = sqrt(antherPoll$anthx.1.abs.vel^2 + antherPoll$anthy.1.abs.vel^2)
      antherPoll$polspeed = sqrt(antherPoll$polx.1.abs.vel^2 + antherPoll$poly.1.abs.vel^2)
      
-     # plot(antherPoll$anthspeed, type = 'l')
-     
-     # plot(antherPoll$anthx.1, antherPoll$anthy.1)
-     # points(antherPoll$anthx, antherPoll$anthy, pch = 20)
-     # plot(antherPoll$anthx)
-     # plot(antherPoll$anthy)
-     
      ###########################################
      # pollen acceleration
      polVelocity = cbind(antherPoll$polx.1.abs.vel, antherPoll$poly.1.abs.vel)
@@ -147,12 +152,8 @@ for(ii in 1:nrow(metDat)){
      # plot(polSpeed)
      tme = antherPoll$tme
      polAccel = data.frame(rbind(c(NA, NA), apply(polVelocity, MARGIN = 2, FUN = diff))) * fps
-     # par(mfrow =c(2,2))
-     # plot(polAccel[,1], x = antherPoll$tme, type = 'l') # calculated
-     # plot(polAccel[,2], x = antherPoll$tme, type = 'l')
      
-     
-     # unit tangent vector
+     # calculate unit tangent vector
      T_t = polVelocity / polSpeed
      
      DT = data.frame(rbind(c(NA, NA), apply(T_t, MARGIN = 2, FUN = diff))) * fps
@@ -172,47 +173,21 @@ for(ii in 1:nrow(metDat)){
      # check total accel by adding normal and tangential accelerations
      # a_total = a_T * T_t + a_N * N_t
      a_total = as.data.frame(t(sapply(X = 1:nrow(polAccel), FUN  = function(x) a_T[x] * T_t[x, ] + a_N[x] * N_t[x,] )))
-     # plot(a_total) # includes both x and y coordinates
-     # plot(polAccel)
-     
-     # par(mfrow = c(2,2))
-     # plot(unlist(a_total[,1]))
-     # plot(unlist(a_total[,2]))
-     # plot(polAccel[,1])
-     # plot(polAccel[,2])
-     
-     
-     # plot(a_N)
-     # plot(a_T)
-     # 
+
      a_T_Pol = a_T
-     # plot(a_T, x = tme)
-     # plot(a_N, x = tme)
      
-     
-     # calculate magnitude of acceleration, using two methods
+     # calculate magnitude of acceleration, using two methods (should be the same)
      # 1. Normal and tangential acceleration
      a_mag1 = sqrt(a_T^2 + a_N^2)
-     # plot(a_mag1)
-     
      amag2 = sqrt(polAccel[,1]^2 + polAccel[,2]^2)
-     # plot(amag2, type = 'l')
-     # plot(polVelocity[,1])
-     
-     
-     ########################################
+
      
      ###########################################
      # anther acceleration
      anthVelocity = cbind(antherPoll$anthx.1.abs.vel, antherPoll$anthy.1.abs.vel)
      anthSpeed = antherPoll$anthspeed
-     # plot(anthSpeed)
      tme = antherPoll$tme
      anthAccel = data.frame(rbind(c(NA, NA), apply(anthVelocity, MARGIN = 2, FUN = diff))) * fps
-     # par(mfrow =c(2,2))
-     # # plot(anthAccel[,1], x = antherPoll$tme, type = 'l') # calculated
-     # plot(anthAccel[,2], x = antherPoll$tme, type = 'l')
-     
      
      # unit tangent vector
      T_t = anthVelocity / anthSpeed
@@ -235,28 +210,8 @@ for(ii in 1:nrow(metDat)){
      # check total accel by adding normal and tangential accelerations
      # a_total = a_T * T_t + a_N * N_t
      a_total = as.data.frame(t(sapply(X = 1:nrow(anthAccel), FUN  = function(x) a_T[x] * T_t[x, ] + a_N[x] * N_t[x,] )))
-     # plot(a_total) # includes both x and y coordinates
-     # plot(anthAccel)
      
-     # par(mfrow = c(2,2))
-     # plot(unlist(a_total[,1]))
-     # plot(unlist(a_total[,2]))
-     # plot(anthAccel[,1])
-     # plot(anthAccel[,2])
-     
-     
-     # plot(a_N)
-     # plot(a_T)
-     
-     # par(mfrow = c(2,1))
-     # plot(a_T, x = tme, type = 'l')
-     # max(a_T, na.rm = TRUE)
-     # which.max(a_T)
-     
-     # plot(a_T_Pol, x = tme, type = 'l')
-     # max(a_T_Pol, na.rm = TRUE)
-     # which.max(a_T_Pol)
-     # 
+     # align frames
      tmeRoll <- seq(from = -which(antherPoll$polStart) + 1, length.out = length(tme)) / fps
      
      dfi <- data.frame(anthSpeed, polSpeed, a_T_anth, a_T_Pol, tme, 
@@ -270,9 +225,15 @@ for(ii in 1:nrow(metDat)){
      
 }
 
+```
+
+
+# Visualize pollen and anther speed
+
+```{r, cache = TRUE}
 theme_set(theme_classic())
 
-savePath = "/Users/callinswitzer/Dropbox/ExperSummer2015/Kalmia2015FiguresAndData/"
+savePath = "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/FigsNotForSubmission/"
 
 # anther speed
 ggplot(newDF, aes(x = centeredTime, y = anthSpeed, group = trial)) + 
@@ -307,9 +268,10 @@ ggplot(newDF, aes(x = centeredTime, y = a_T_Pol, group = trial)) +
      xlim(c(-0.01, 0.02)) + 
      labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)")
 ggsave(paste0(savePath, "PollenTangAccel01_CVSmoothSpline.pdf"), width = 5, height = 4)
+```
 
-# find max for each measurement for each trial
-
+# Find max for each measurement for each trial and visualize
+```{r, cache = TRUE}
 # anther speed
 mmx <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
      tmp <- newDF[newDF$trial == x, ]
@@ -389,9 +351,15 @@ ggplot() +
      geom_point(data = mmpp, aes(x = centeredTime, y = a_T_Pol), color = 'red', alpha = 0.5)
 
 ggsave(paste0(savePath, "pollenTangAccelMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
+```
 
 
-# estimate ranges for acceleration, and speed
+
+
+
+# Estimate means and CI's for acceleration, and speed
+# Conduct model diagnostics to evaluate model quality
+```{r, cache = TRUE}
 md  = merge(x = mmx[, c('trial', 'anthSpeed')], metDat, by.x = "trial", by.y = 
                  "VideoName")
 md = merge(x = mmp[, c('trial', 'polSpeed')], md, by = "trial")
@@ -420,7 +388,7 @@ qqline(ranef(modVelMaxAnth)$FlowerNumber[[1]]) #
 
 
 modVelMaxPol <- lmer(formula = polSpeed ~ (1|plant/FlowerNumber), data = md)
-summary(modVelMaxPol)
+summary(modVelMaxPol) # final model for paper
 confint(modVelMaxPol)
 plot(modVelMaxPol)
 
@@ -429,10 +397,22 @@ plot(modVelMaxPol)
 hist(md$a_T_Pol)
 hist(log(md$a_T_Pol)) #better
 modAccMaxPol <- lmer(formula = log(a_T_Pol) ~  (1|plant/FlowerNumber), data = md)
-summary(modAccMaxPol)
-exp(confint(modAccMaxPol))
+summary(modAccMaxPol) #final model for paper
+exp(confint(modAccMaxPol)) # CI for paper
 plot(modAccMaxPol)
 
+# QQPlot for group-level effects
+qqnorm(ranef(modAccMaxPol)$plant[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(modAccMaxPol)$plant[[1]])
+
+# QQPlot for group-level effects
+qqnorm(ranef(modAccMaxPol)$FlowerNumber[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(modAccMaxPol)$FlowerNumber[[1]]) 
+
+
+
+
+# not reporting anthers, because they're basically the same as the pollen
 modAccMaxAnth <- lmer(formula = log(a_T_anth) ~ (1|plant/FlowerNumber), data = md)
 summary(modAccMaxAnth)
 exp(confint(modAccMaxAnth))
@@ -447,4 +427,4 @@ qqline(ranef(modAccMaxAnth)$plant[[1]])
 # QQPlot for group-level effects
 qqnorm(ranef(modAccMaxAnth)$FlowerNumber[[1]], main="Normal Q-Q plot for random effects")
 qqline(ranef(modAccMaxAnth)$FlowerNumber[[1]]) # 
-
+```

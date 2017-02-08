@@ -1,4 +1,13 @@
+
+# python stuff
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+
+# Rproject stu
 .Rproj.user
+
+*/.Rproj.user/*
 .Rhistory
 .RData
 
@@ -45,7 +54,7 @@
 /*.Rcheck/
 
 # RStudio files
-.Rproj.user/
+.Rproj.user/*
 
 # produced vignettes
 vignettes/*.html

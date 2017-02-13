@@ -1,0 +1,659 @@
+---
+title: "Statistical Analysis and visualization of Kalmia fruits"
+author: "Callin Switzer"
+date: "February 10, 2017"
+output: html_document
+---
+
+
+<pre>
+# Kalmia analyze fruit size at end of season
+# Using fruit sizes calculated from image segmentation in Python with opencv
+#  Callin Switzer
+# 20 October 2016
+# 10 Feb 2017 Update: Conducted Statistical Modeling with LMER and GLMER
+</pre>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/DatasetsSupplemental/")
+```
+
+
+## Read in data
+
+```{r, warning=FALSE, message = FALSE}
+ipak <- function(pkg){
+     new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+     if(length(new.pkg)) install.packages(new.pkg, dependencies = TRUE)
+     sapply(pkg, require, character.only = TRUE)
+}
+
+packages <- c("ggplot2", 'lme4', 'plyr', 'influence.ME', 'sjPlot', 'multcomp', 'lsmeans', 'Matrix')
+ipak(packages)
+
+theme_set(theme_classic())
+
+kfrt <- read.csv("kalmiaFruitFinal.csv", stringsAsFactors = FALSE)
+nrow(kfrt[kfrt$dia_mm == 20.0,]) # number of images taken
+
+# clean and process data
+kfrt <- kfrt[kfrt$dia_mm != 20.0, ] # 20 is the reference object in segmented images
+nrow(kfrt) # number of total fruits measured
+
+
+# label treatmens and access numbers
+kfrt$trt <- sapply(X = 1:nrow(kfrt), FUN = function(x) strsplit(kfrt$plantNum[x], split = "__")[[1]][2])
+kfrt$accessNum <- sapply(X = 1:nrow(kfrt), FUN = function(x) strsplit(kfrt$plantNum[x], split = "__")[[1]][1])
+
+kfrt$trt <- mapvalues(kfrt$trt, c(1,2,3,4,5), c("Bagged", "Bagged & Selfed", "Unbagged", 
+                                                "Unbagged & Outcrossed", "Unbagged_2"))
+```
+
+
+# Add plants with 0 count to the dataset
+```{r}
+# count number of fruits
+counts = as.data.frame(table(kfrt$plantNum))
+counts$trt = sapply(X = 1:nrow(counts), FUN = function(x) strsplit(as.character(counts$Var1[x]), split = "__")[[1]][2])
+
+counts$trt <- mapvalues(counts$trt, c(1,2,3,4,5), c("Bagged", "Bagged & Selfed", "Unbagged", 
+                                                "Unbagged & Outcrossed", "Unbagged_2"))
+
+
+counts$accessNum = sapply(X = 1:nrow(counts), FUN = function(x) strsplit(as.character(counts$Var1[x]), split = "__")[[1]][1])
+
+
+# add in the trts and accession numbers that had counts of 0
+# read in error-checked datasheet
+kalNotes <- read.csv("KalmiaDailyDatasheets_ErrorChecked.csv")
+
+# get the accession numbers I should have
+accNumsHave <- unique(kalNotes$Plant.Number)
+accNumsHave <- accNumsHave[!(accNumsHave %in% c("", "Plant Number"))]
+
+#change formatting to match above
+accNumsHave <- gsub("#", "", accNumsHave)
+accNumsHave <- gsub("\ ", "_", accNumsHave)
+accNumsHave <- gsub("\\-", "_", accNumsHave)
+accNumsHave <- gsub("\\*", "_", accNumsHave)
+accNumsHave <-toupper(accNumsHave)
+
+shouldHave <- as.data.frame(t(sapply(accNumsHave, function(x) as.character(paste(x, c(1:4), sep = "__")))))
+row.names(shouldHave) <- NULL
+shouldHave1 <- c(as.character(shouldHave[, 1]), 
+                 as.character(shouldHave[, 2]), 
+                 as.character(shouldHave[, 3]), 
+                 as.character(shouldHave[, 4]))
+
+# find missing ones -- this is the ones that
+# are in the daily datasheet that aren't in the fruit measurements
+missingTrts <- setdiff(shouldHave1,unique(kfrt$plantNum[kfrt$trt != "5"]))
+
+# this should be 0 -- the ones from the fruit measurements that aren't in the daily datasheet
+setdiff(unique(kfrt$plantNum[kfrt$trt != "Unbagged_2"]), shouldHave1)
+
+# here's the list of plants that had their bags/tags go missing during the experiment (meaning that
+# I was unable to collect fruits)
+# note: "677_66_MASS__1" was the only plant that was missing a tag during the final collection
+# that wasn't missing in one of my previous checks. 
+NAList <- c("1129_74_E__4", "1129_74_C__4", "39_60_A__3", "685_70_A__2", "677_66_MASS__1")
+
+# note: this ignores trt#5 which is the same as #3
+ZeroFruitPlants <- missingTrts[!(missingTrts %in% NAList)]
+
+zfdf <- data.frame(Var1 = ZeroFruitPlants, 
+                   Freq = 0, 
+                   trt = sapply(X = 1:length(ZeroFruitPlants), 
+                                FUN = function(x) strsplit(as.character(ZeroFruitPlants[x]), 
+                                                           split = "__")[[1]][2]),
+                   accessNum = sapply(X = 1:length(ZeroFruitPlants), 
+                                            FUN = function(x) strsplit(as.character(ZeroFruitPlants[x]), 
+                                                                       split = "__")[[1]][1])
+                   )
+
+zfdf$trt <- mapvalues(zfdf$trt, c(1,2,3,4,5), c("Bagged", "Bagged & Selfed", "Unbagged", 
+                                                "Unbagged & Outcrossed", "Unbagged_2"))
+
+countFin <- rbind(counts, zfdf)
+
+
+# final fruit counts for the fruits collected at the end of the experiment
+countFin <- countFin[order(countFin$accessNum, countFin$trt, decreasing = FALSE), ]
+
+# change labels from unbagged to conntrol
+countFin$trt <- mapvalues(countFin$trt, c("Bagged", "Bagged & Selfed", "Unbagged", 
+                                                "Unbagged & Outcrossed", "Unbagged_2")
+                          , c("Bagged", "Bagged & Selfed", "Control", 
+                                                "Unbagged & Outcrossed", "Control_2"))
+# change levels, so that control is first
+countFin$trt <- factor(countFin$trt, levels = c("Control","Control_2", "Bagged", "Bagged & Selfed", 
+                                                "Unbagged & Outcrossed"))
+
+```
+
+# Visualize counts of fruits
+```{r}
+ggplot(countFin, aes(x = trt , y = Freq, fill = trt)) + 
+     geom_boxplot() +
+    # geom_violin()+
+     
+     labs(y = "Number of fruits", x = "Treatment") + 
+     scale_fill_brewer(name = "Treatment", palette = "Set1")
+saveDir <- "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/Media/"
+ggsave(paste0(saveDir, "KalmiaFruitNumber.pdf"), width = 10, height = 8)
+```
+
+
+# Visualize counts of fruits (ignore treatment #5)
+```{r}
+ggplot(countFin[!(countFin$trt %in% 'Control_2'), ], aes(x = trt , y = Freq, fill = trt)) + 
+     geom_boxplot() +
+     labs(y = "Number of fruits", x = "Treatment") +
+     theme(axis.text.x = element_text(angle = 35, hjust = 1), 
+           legend.position = 'none') + 
+     scale_fill_brewer(name = "Treatment", palette = "Set1")
+
+ggsave(paste0(saveDir, "KalmiaFruitNumber_trt1_4Only.pdf"), width = 5, height = 4)
+```
+
+# Use GLMM's to find differences in number of fruits
+### First, summarize the dataset that I will be using
+```{r}
+# I'm ignoring control#2, because it was originally intended for another experiment (analysis wasn't planned)
+cf1 <- countFin[countFin$trt != "Control_2",]
+nrow(countFin) # number of total counts, including Control2
+sum(cf1$Freq) # total number of fruits in the analysis of count
+# Number of counts, excluding control_2
+# this is different from the number of photos
+# because I didn't take photos on 0-count plants
+nrow(cf1) 
+data.frame(table(cf1$trt)) # number of plants in each treatment that we are analyzing
+data.frame(table(cf1$accessNum)) # shows number of counts per plant -- 4 means that we counted all four treatments
+
+# shows which treatments / plants are missing from analysis
+# this is different from the plants that just had 0 counts
+data.frame(table(interaction(cf1$accessNum , cf1$trt))) 
+```
+
+# Create a model
+
+```{r}
+m1 <- glmer(Freq ~ trt + (1|accessNum), family = poisson, data = cf1)
+summary(m1)
+
+# calculate LRT for trt
+m2 <- update(m1, .~. - trt)
+anova(m1, m2) # highly significant
+```
+
+
+# Model diagnostics
+```{r, cache = TRUE}
+# diagnostics
+# qq plot
+qqnorm(resid(m1), main = "")
+qqline(resid(m1)) # good, one possible outlier
+
+# residual plot
+plot(fitted(m1), resid(m1), xlab = "fitted", ylab = "residuals")
+abline(0,0)
+# possibly one or two outliers
+
+
+# QQPlot for group-level effects
+qqnorm(ranef(m1)$accessNum[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(m1)$accessNum[[1]]) # looks good
+
+infl <- influence(m1, obs = TRUE) # takes a while to calculate
+plot(infl, which = 'cook') # nothing above 1
+
+# visualize model: 
+sjp.lmer(m1, type = 'fe')
+sjp.lmer(m1, type = 're', sort = TRUE) # plot random effects to look for outliers
+
+#check assumptions of model 
+overdisp_fun <- function(model) {
+  ## number of variance parameters in 
+  ##   an n-by-n variance-covariance matrix
+  vpars <- function(m) {
+    nrow(m)*(nrow(m)+1)/2
+  }
+  model.df <- sum(sapply(VarCorr(model),vpars))+length(fixef(model))
+  rdf <- nrow(model.frame(model))-model.df
+  rp <- residuals(model,type="pearson")
+  Pearson.chisq <- sum(rp^2)
+  prat <- Pearson.chisq/rdf
+  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
+  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
+}
+
+overdisp_fun(m1) 
+
+# here's another way to check for overdispersion
+residDev <- sum(residuals(m1, type = 'deviance')^2) # calculate residual deviance
+# this ratio should be about 1 -- larger than 1 suggests overdispersion
+residDev / df.residual(m1) 
+```
+
+
+## Use negative binomial model, since the poisson model is overdispersed
+```{r}
+m1.1 <- glmer.nb(Freq ~ trt + (1|accessNum), data = cf1)
+summary(m1.1)
+
+# get overall p-value for treatment
+m2.1 <- update(m1.1, .~. - trt)
+anova(m1.1, m2.1, test = 'LRT')
+```
+
+# Negative binomial model diagnostics
+```{r, cache = TRUE}
+overdisp_fun(m1.1) 
+
+# here's another way to check for overdispersion
+residDev <- sum(residuals(m1.1, type = 'deviance')^2) # calculate residual deviance
+# this ratio should be about 1 -- larger than 1 suggests overdispersion
+residDev / df.residual(m1.1) 
+
+# diagnostics
+# qq plot
+qqnorm(resid(m1.1), main = "")
+qqline(resid(m1.1)) # good, one possible outlier
+
+# residual plot
+plot(fitted(m1.1), resid(m1.1), xlab = "fitted", ylab = "residuals")
+abline(0,0) # residuals look better for this model
+
+
+# QQPlot for group-level effects
+qqnorm(ranef(m1.1)$accessNum[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(m1.1)$accessNum[[1]]) # looks good
+
+infl <- influence(m1.1, obs = TRUE) # takes a while to calculate
+plot(infl, which = 'cook') # nothing above 1
+
+# visualize model: 
+sjp.lmer(m1.1, type = 'fe')
+sjp.lmer(m1.1, type = 're', sort = TRUE) # plot random effects to look for outliers
+
+# get estimated dispersion parameter for NB Model
+getME(m1.1, "glmer.nb.theta") # 2.37
+
+# post-hoc pairwise comparisons with adjusted p-values
+# from documentation: 
+# test = adjusted() multiple test procedures as specified by the type argument
+# to adjusted: "single-step" denotes adjusted p values as computed
+# from the joint normal or t distribution of the z statistics (default),
+summary(glht(m1.1, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
+```
+
+# Visualize annotated plot for fruit counts
+```{r}
+count_pub <- within(countFin, {
+     trt <- mapvalues(trt, from = c("Control","Control_2", "Bagged", "Bagged & Selfed", 
+                                                "Unbagged & Outcrossed"), 
+                      to = c("Control","Control_2", "Bagged", "Bagged\n & Selfed", 
+                                                "Outcrossed"))
+})
+
+count_pub <- droplevels(count_pub)
+
+
+ggplot(count_pub[!(count_pub$trt %in% 'Control_2'), ], aes(x = trt , y = Freq+ 0.1)) + 
+     geom_boxplot(width = 0.2, fill = 'grey80') +
+     labs(y = "Number of fruits", x = "Treatment") +
+     theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+           legend.position = 'none') + 
+     # annotate
+     annotate(geom="text", x=c(1,2,3,4), y=c(70, 70, 70, 70) + 10, label=c("a", "b", "a", "c"),
+               color="black") + 
+     scale_y_log10(breaks = c(1, 10, 100), limits = c(0.1, 100))
+
+ggsave(paste0(saveDir, "KalmiaFruitNumber_logScale.pdf"), width = 3, height = 4)
+```
+
+
+# Visualize CI's for each of the groups
+```{r, cache = TRUE}
+# refit m1.1 with treatments in alphabetical order (b/c order isn't preserved in model matrix)
+cf1.1 <- within(cf1, {
+     trt = as.factor(as.character(cf1$trt))
+})
+
+# refit model with different reference levels
+m1.1 <- glmer.nb(Freq ~ trt + (1|accessNum), data = cf1.1)
+pframe <- data.frame(trt = levels(droplevels(cf1.1$trt)))
+pframe$Freq <- 0
+pp <- predict(m1.1, newdata = pframe, re.form=NA, type = 'response') # re.form sets all random effects to 0
+
+
+### Calculate CI's (using bootstrap, not accounting for random effects)
+mm <- model.matrix(terms(m1.1), pframe)
+predFun<-function(.) exp(mm%*%fixef(.) )
+bb<-bootMer(m1.1,FUN=predFun,nsim=200) #do this 200 times
+#as we did this 200 times the 95% CI will be bordered by the 5th and 195th value
+bb_se<-apply(bb$t,2,function(x) quantile(x, probs = c(0.025, 0.975)))
+pframe$blo<-bb_se[1,]
+pframe$bhi<-bb_se[2,]
+pframe$predMean <- pp
+
+pframe$median = tapply(cf1.1$Freq, INDEX = cf1.1$trt, median)
+
+
+
+pframe$trt <- mapvalues(pframe$trt, from = c("Control", "Bagged", "Bagged & Selfed", 
+                                                "Unbagged & Outcrossed"),
+                        to = c("Control", "Bagged", "Bagged\n & Selfed", 
+                                                "Outcrossed"))
+pframe$trt <- relevel(pframe$trt, ref = "Control")
+
+#plot 95% confidence intervals
+# "Mean and bootstrap CI based on fixed-effects uncertainty ONLY"
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+g0 <- ggplot(pframe, aes(x=trt, y=predMean))+
+     geom_point()+ 
+     labs(y = "Number of fruits", x = "Treatment") + 
+     geom_errorbar(aes(ymin = blo, ymax = bhi), width = 0.1)+
+     scale_y_log10(limits =c(1,60), breaks = number_ticks(6)) + 
+     theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+           legend.position = 'none') +
+     # annotate
+     annotate(geom="text", x=c(1,2,3,4), y=c(70, 70, 70, 70) - 10, label=c("a", "b", "a", "c"),
+               color="black") 
+g0
+ggsave(paste0(saveDir, "KalmiaFruitNumber_BSCI_logScale.pdf"), width = 3, height = 4)
+
+
+## Bootstrap CI on linear scale -- not that great!
+g1 <- ggplot(pframe, aes(x=trt, y=predMean))+
+     geom_point()+ 
+     labs(y = "Number of Fruits", x = "Treatment") + 
+     geom_errorbar(aes(ymin = blo, ymax = bhi), width = 0.1)+ 
+     theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+           legend.position = 'none') +
+     # annotate
+     annotate(geom="text", x=c(1,2,3,4), y=c(70, 70, 70, 70) - 30, label=c("a", "b", "a", "c"),
+               color="black") 
+g1
+ggsave(paste0(saveDir, "KalmiaFruitNumber_BSCI_LinearScale.pdf"), width = 3, height = 4)
+
+
+cp <- droplevels(count_pub[count_pub$trt != 'Control_2',])
+
+# this might actually be the best way
+ggplot(cp, aes(x = trt , y = Freq)) + 
+     geom_boxplot(width = 0.2, fill = 'grey80') +
+     labs(y = "Number of fruits", x = "Treatment") +
+     theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+           legend.position = 'none') + 
+     # annotate
+     annotate(geom="text", x=c(1,2,3,4), y=c(70, 70, 70, 70) + 1, label=c("a", "b", "a", "c"),
+               color="black") 
+ggsave(paste0(saveDir, "KalmiaFruitNumber_LinearScale.pdf"), width = 3, height = 4)
+```
+
+
+# Visualize fruit size
+```{r}
+# calculate fruit size by plant
+sizeDF_mean <- as.data.frame(tapply(kfrt$dia_mm, INDEX = kfrt$plantNum, mean))
+colnames(sizeDF_mean) = "meanFrtSz"
+sizeDF_mean$trt = sapply(X = 1:length(sizeDF_mean$meanFrtSz), 
+                          FUN = function(x) strsplit(as.character(row.names(sizeDF_mean)[x]), 
+                                                     split = "__")[[1]][2])
+
+sizeDF_mean$trt <- mapvalues(sizeDF_mean$trt, c(1,2,3,4,5), c("Bagged", "Bagged & Selfed", "Control", 
+                                                "Unbagged & Outcrossed", "Control_2"))
+
+# reorder
+sizeDF_mean$trt <- factor(sizeDF_mean$trt, levels = c("Control", "Control_2", "Bagged", "Bagged & Selfed",  
+                                                "Unbagged & Outcrossed"))
+
+sizeDF_mean$accessNum = sapply(X = 1:length(sizeDF_mean$meanFrtSz), 
+                   FUN = function(x) strsplit(as.character(row.names(sizeDF_mean)[x]), 
+                                              split = "__")[[1]][1])
+
+
+ggplot(sizeDF_mean, aes(x = trt, y = meanFrtSz, fill = trt)) + 
+     geom_boxplot(alpha = 0.5) + 
+#      stat_summary(fun.y=mean, geom="line", aes(group = accessNum, color = accessNum))  + 
+#      stat_summary(fun.y=mean, geom="point", aes(group = accessNum, color = accessNum)) + 
+     geom_point(aes(color = trt))
+
+
+ggplot(sizeDF_mean, aes(x = trt, y = meanFrtSz, fill = trt)) + 
+     geom_boxplot() + 
+     labs(y = "Mean Fruit Diameter (mm)", x = "Treatment") + 
+     scale_fill_brewer(name = "Treatment", palette = "Set1")
+ggsave(paste0(saveDir, "KalmiaFruitDiameter.pdf"), width = 10, height = 8)
+
+
+# visualize , but exclude treatment 5
+ggplot(sizeDF_mean[!(sizeDF_mean$trt %in% 'Control_2'), ], 
+       aes(x = trt, y = meanFrtSz, fill = trt)) + 
+     geom_boxplot() + 
+     labs(y = "Mean Fruit Diameter (mm)", x = "Treatment") + 
+     scale_fill_brewer(name = "Treatment", palette = "Set1") + 
+     theme(axis.text.x = element_text(angle = 35, hjust = 1), 
+          legend.position = 'none') 
+ggsave(paste0(saveDir, "KalmiaFruitDiameter_trt14Only.pdf"), width = 5, height = 4)
+```
+
+
+# Model Fruit Size with LMER
+```{r}
+size1 <- within(kfrt, {
+     trt <- mapvalues(trt, c("Bagged", "Bagged & Selfed", "Unbagged", 
+                                                "Unbagged & Outcrossed", "Unbagged_2"), 
+                      c("Bagged", "Bagged\n & Selfed", "Control", 
+                                                "Outcrossed", "Control_2"))
+})
+
+size1 <- droplevels(size1[size1$trt != "Control_2",])
+
+# get sample sizes for size dataset
+nrow(size1) # total number of fruits in analysis for size
+data.frame(table(size1$accessNum)) # total number of fruits per plant
+
+
+size1$trt <- relevel(as.factor(size1$trt), ref = "Control")
+f1 <- lmer(dia_mm ~ trt + (1|accessNum), data = size1)
+summary(f1) # final model for paper
+
+# get p-value for trt
+f2 <- update(f1, .~. - trt)
+anova(f1, f2, "LRT")
+```
+
+
+# Fruit Size Diagnostics
+```{r, cache = TRUE}
+# diagnostics
+# qq plot
+qqnorm(resid(f1), main = "")
+qqline(resid(f1)) # good
+
+# residual plot
+plot(fitted(f1), residuals(f1, type = "deviance"), xlab = "fitted", ylab = "residuals")
+abline(0,0) # residuals look better for this model
+
+
+# QQPlot for group-level effects
+qqnorm(ranef(f1)$accessNum[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(f1)$accessNum[[1]]) # looks good
+
+infl <- influence(f1, obs = TRUE) # takes a while to calculate
+plot(infl, which = 'cook') # nothing above 1
+
+# visualize model: 
+sjp.lmer(f1, type = 'fe')
+
+# Best Linear Unbiased Predictors (BLUPs)
+sjp.lmer(f1, type = 're', sort = TRUE) # plot random effects to look for outliers
+
+# post-hoc pairwise comparisons with adjusted p-values
+# from documentation: 
+# test = adjusted() multiple test procedures as specified by the type argument
+# to adjusted: "single-step" denotes adjusted p values as computed
+# from the joint normal or t distribution of the z statistics (default),
+summary(glht(f1, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
+```
+
+
+# Visualize Fruit Size with annotations
+```{r}
+# refit m1.1 with treatments in alphabetical order (b/c order isn't preserved in model matrix)
+sf1<- within(size1, {
+     trt = as.factor(as.character(size1$trt))
+})
+
+# refit model with different reference levels
+f1 <- lmer(dia_mm ~ trt + (1|accessNum), data = sf1)
+pframe <- data.frame(trt = levels(droplevels(sf1$trt)))
+pframe$dia_mm = 0
+pp <- predict(f1, newdata = pframe, re.form=NA, type = 'response') # re.form sets all random effects to 0
+
+
+### Calculate CI's (using bootstrap, not accounting for random effects)
+mm <- model.matrix(terms(f1), pframe)
+predFun<-function(.) mm%*%fixef(.)
+bb<-bootMer(f1,FUN=predFun,nsim=200) #do this 200 times
+# get quantiles from bootstrap sample
+bb_se<-apply(bb$t,2,function(x) quantile(x, probs = c(0.025, 0.975)))
+pframe$blo<-bb_se[1,]
+pframe$bhi<-bb_se[2,]
+pframe$predMean <- pp
+pframe # print frame, in case reporting in a table
+
+pframe$trt <- relevel(pframe$trt, ref = "Control")
+
+#plot 95% confidence intervals
+# "Mean and bootstrap CI based on fixed-effects uncertainty ONLY"
+g2 <- ggplot(pframe, aes(x=trt, y=predMean))+
+     geom_point()+ 
+     labs(y = "Fruit dia. (mm)", x = "Treatment") + 
+     geom_errorbar(aes(ymin = blo, ymax = bhi), width = 0.1)+
+     theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+           legend.position = 'none') +
+     # annotate
+     annotate(geom="text", x=c(1,2,3,4), y=c(5,5,5,5) + 0.7, label=c("a", "b", "a", "c"),
+               color="black") 
+g2
+ggsave(paste0(saveDir, "KalmiaFruitDia_BSCI.pdf"), width = 3, height = 4)
+
+ ## visualize raw data (mean fruit size per plant)
+
+sdf1 <- droplevels(within(sizeDF_mean[!(sizeDF_mean$trt %in% 'Control_2'), ], {
+     trt <- mapvalues(trt, c("Bagged", "Bagged & Selfed", "Control", 
+                                                "Unbagged & Outcrossed", "Control_2"), 
+                      c("Bagged", "Bagged\n & Selfed", "Control", 
+                                                "Outcrossed", "Control_2"))
+}))
+
+# visualize fruit size
+ggplot(sdf1, aes(x = trt, y = meanFrtSz)) + 
+     geom_boxplot(width = 0.2, fill = 'grey80') +
+     labs(y = "Fruit dia. (mm)", x = "Treatment") +
+     theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+           legend.position = 'none') + 
+     # annotate
+     annotate(geom="text", x=c(1,2,3,4), y=c(5,5,5,5) + 2, label=c("a", "b", "a", "c"),
+               color="black")
+ggsave(paste0(saveDir, "KalmiaFruitDia.pdf"), width = 3, height = 4)
+
+
+# compare two plots
+g2 + geom_boxplot(data = sdf1, aes(x = trt, y = meanFrtSz), width = 0.2, alpha = 0)
+```
+
+
+# Visualize data to compare fruit size with number of seeds
+
+```{r}
+# read in data
+sizeSeed <- read.csv("KalmiaFruitSizeAndSeeds.csv")
+
+ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) + 
+     geom_point() + 
+     stat_smooth(method = 'lm', formula = y ~ exp(x), se = F) + 
+     labs(x = 'Fruit Diameter (mm)', y = 'Num Seeds in 1 Carpel')
+
+ggsave(paste0(saveDir, "KalmiaFruitSeeds.pdf"), width = 5, height = 4)
+
+
+# on log scale
+ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) + 
+     geom_point() + 
+     stat_smooth(method = 'lm', formula = y ~ x, se = F) + 
+     scale_y_continuous(trans="log") + 
+     labs(y = "log(e) number of seeds")
+
+# GLM 
+ss1 <- glm(NumSeeds ~ Dia..mm., family = poisson, data = sizeSeed)
+summary(ss1)
+
+ss1$deviance / ss1$df.residual # overdispersed
+
+
+# Neg Binomial Model 
+ss2 <- glm.nb(NumSeeds ~ Dia..mm., data = sizeSeed)
+summary(ss2) # final model for paper
+
+
+# get overall test stat for dia
+ss3 <-update(ss2, .~. - Dia..mm.)
+anova(ss2, ss3) # overall p-value for Dia..mm.
+
+## visualize CI's for the two different models
+
+newD <- data.frame(Dia..mm. = seq(2, 6, length.out = 100))
+nbPreds = predict(ss2, newD, type = 'response', se.fit = TRUE)
+nd1 <- data.frame(newD, nppred = nbPreds$fit, npse = nbPreds$se.fit)
+predsPois <- predict(ss1, newD, type = 'response', se.fit = TRUE)
+
+
+n2 <- data.frame(nd1, poisPred = predsPois$fit, poisse = predsPois$se.fit)
+n2$npUpper <- with(n2,  nppred + 2 * npse)
+n2$npLower <- with(n2, nppred - 2 * npse)
+n2$pUpper <- with(n2,  poisPred + 2 * poisse)
+n2$pLower <- with(n2, poisPred - 2 * poisse)
+
+# compare NB errors vs. Pois errors
+ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) + 
+     geom_point() + 
+     geom_line(data = n2, aes(x = Dia..mm., y = poisPred), color = 'blue') + 
+     geom_line(data = n2, aes(x = Dia..mm., y = pUpper), color = 'blue', linetype = 2) + 
+     geom_line(data = n2, aes(x = Dia..mm., y = pLower), color = 'blue', linetype = 2) + 
+     labs(x = 'Fruit Diameter (mm)', y = 'Num Seeds in 1 Carpel') + 
+     geom_line(data = n2, aes(x = Dia..mm., y = nppred), color = 'red') + 
+     geom_line(data = n2, aes(x = Dia..mm., y = npUpper), color = 'red', linetype = 3) + 
+     geom_line(data = n2, aes(x = Dia..mm., y = npLower), color = 'red', linetype = 3)
+
+
+## model diagnostics for negative binomial model
+plot(ss2, which = 4) #cook's distance
+
+
+plot(y = residuals(ss2, type = 'deviance'), x = ss2$fitted.values)
+abline(h = 0)
+
+# should be close to 1
+ss2$deviance / ss2$df.residual
+
+# get sample size
+nrow(sizeSeed) # total number of individual fruits
+
+sum(sizeSeed$NumSeeds) # total number of seeds counted
+
+```
+
+
+### Print sesion info
+```{r}
+sessionInfo()
+
+# print time of that html document was created
+Sys.time()
+```

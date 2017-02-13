@@ -19,7 +19,13 @@ knitr::opts_knit$set(root.dir = "/Users/callinswitzer/Dropbox/ExperSummer2016/Ka
 
 ### Read in metadata, and prep for video processing
 
+
+
+
 ```{r}
+# session Info
+sessionInfo()
+
 #set wd
 setwd("/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/DatasetsSupplemental/KalmiaDigitizedPolygon/")
 

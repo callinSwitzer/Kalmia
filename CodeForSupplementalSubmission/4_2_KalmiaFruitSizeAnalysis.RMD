@@ -650,6 +650,10 @@ ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) +
 ss1 <- glmer(NumSeeds ~ Dia..mm. + (1|plantLineage), family = poisson, data = sizeSeed)
 summary(ss1)
 
+ss2 <- update(ss1, .~. - Dia..mm.)
+anova(ss1, ss2, test = "LRT") # LRT for paper
+
+
 residDev <- sum(residuals(ss1, type = 'deviance')^2) # calculate residual deviance
 # this ratio should be about 1 -- larger than 1 suggests overdispersion
 residDev / df.residual(ss1) 

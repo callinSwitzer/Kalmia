@@ -12,6 +12,7 @@ output: html_document
 #  Callin Switzer
 # 20 October 2016
 # 10 Feb 2017 Update: Conducted Statistical Modeling with LMER and GLMER
+# 11 March 2017 Update: added random effect to MER models to account for plant lineage
 </pre>
 
 
@@ -33,6 +34,8 @@ ipak <- function(pkg){
 packages <- c("ggplot2", 'lme4', 'plyr', 'influence.ME', 'sjPlot', 'multcomp', 'lsmeans', 'Matrix')
 ipak(packages)
 
+setwd("/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/DatasetsSupplemental/")
+
 theme_set(theme_classic())
 
 kfrt <- read.csv("kalmiaFruitFinal.csv", stringsAsFactors = FALSE)
@@ -49,6 +52,10 @@ kfrt$accessNum <- sapply(X = 1:nrow(kfrt), FUN = function(x) strsplit(kfrt$plant
 
 kfrt$trt <- mapvalues(kfrt$trt, c(1,2,3,4,5), c("Bagged", "Bagged & Selfed", "Unbagged", 
                                                 "Unbagged & Outcrossed", "Unbagged_2"))
+# add plant lineage (all plants that start with 1129 are from the lineage, 673_69 )
+plantInds <- 1:nrow(kfrt) %in% grep(pattern = "1129", x = kfrt$plantNum)
+kfrt$plantLineage <- sapply(1:length(plantInds), FUN = function(x){
+     ifelse(plantInds[x], "673_69", paste(strsplit(kfrt$plantNum[x], split = "_")[[1]][1:2], collapse = "_") )})
 ```
 
 
@@ -131,6 +138,10 @@ countFin$trt <- mapvalues(countFin$trt, c("Bagged", "Bagged & Selfed", "Unbagged
 countFin$trt <- factor(countFin$trt, levels = c("Control","Control_2", "Bagged", "Bagged & Selfed", 
                                                 "Unbagged & Outcrossed"))
 
+plantInds <- 1:nrow(countFin) %in% grep(pattern = "1129", x = countFin$accessNum)
+countFin$plantLineage <- sapply(1:length(plantInds), FUN = function(x){
+     ifelse(plantInds[x], "673_69", paste(strsplit(countFin$accessNum[x], split = "_")[[1]][1:2], collapse = "_") )})
+
 ```
 
 # Visualize counts of fruits
@@ -143,6 +154,7 @@ ggplot(countFin, aes(x = trt , y = Freq, fill = trt)) +
      scale_fill_brewer(name = "Treatment", palette = "Set1")
 saveDir <- "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/Media/"
 ggsave(paste0(saveDir, "KalmiaFruitNumber.pdf"), width = 10, height = 8)
+
 ```
 
 
@@ -150,6 +162,7 @@ ggsave(paste0(saveDir, "KalmiaFruitNumber.pdf"), width = 10, height = 8)
 ```{r}
 ggplot(countFin[!(countFin$trt %in% 'Control_2'), ], aes(x = trt , y = Freq, fill = trt)) + 
      geom_boxplot() +
+     # geom_point(aes(color = plantLineage)) + 
      labs(y = "Number of fruits", x = "Treatment") +
      theme(axis.text.x = element_text(angle = 35, hjust = 1), 
            legend.position = 'none') + 
@@ -162,7 +175,7 @@ ggsave(paste0(saveDir, "KalmiaFruitNumber_trt1_4Only.pdf"), width = 5, height = 
 ### First, summarize the dataset that I will be using
 ```{r}
 # I'm ignoring control#2, because it was originally intended for another experiment (analysis wasn't planned)
-cf1 <- countFin[countFin$trt != "Control_2",]
+cf1 <- droplevels(countFin[countFin$trt != "Control_2",])
 nrow(countFin) # number of total counts, including Control2
 sum(cf1$Freq) # total number of fruits in the analysis of count
 # Number of counts, excluding control_2
@@ -171,6 +184,8 @@ sum(cf1$Freq) # total number of fruits in the analysis of count
 nrow(cf1) 
 data.frame(table(cf1$trt)) # number of plants in each treatment that we are analyzing
 data.frame(table(cf1$accessNum)) # shows number of counts per plant -- 4 means that we counted all four treatments
+data.frame(table(cf1$plantLineage))
+
 
 # shows which treatments / plants are missing from analysis
 # this is different from the plants that just had 0 counts
@@ -178,10 +193,38 @@ data.frame(table(interaction(cf1$accessNum , cf1$trt)))
 ```
 
 # Create a model
+Account for plant lineage and accession number
 
 ```{r}
+m1 <- glmer(Freq ~ trt + I(plantLineage == "673_69") +  (1|accessNum), family = poisson, data = cf1)
+summary(m1)
+
+factorPreds <- predict(m1)
+length(factorPreds)
+
+m1 <- glmer(Freq ~ trt + (1|plantLineage) +  (1|accessNum), family = poisson, data = cf1)
+summary(m1)
+
+merPreds <- predict(m1)
+plot(factorPreds, merPreds)
+abline(0,1)
+
+m1_1 <- glmer(Freq ~ trt + (1|plantLineage), family = poisson, data = cf1)
+anova(m1, m1_1, test = "LRT") # keep accessNum
+summary(m1)
+
+merPreds <- predict(m1, newdata = avgDF)
+plot(factorPreds, merPreds)
+abline(0,1)
+
 m1 <- glmer(Freq ~ trt + (1|accessNum), family = poisson, data = cf1)
 summary(m1)
+
+nonIndPreds <- predict(m1, newdata = avgDF)
+plot(nonIndPreds, merPreds)
+abline(0,1)
+
+
 
 # calculate LRT for trt
 m2 <- update(m1, .~. - trt)
@@ -191,23 +234,31 @@ anova(m1, m2) # highly significant
 
 # Model diagnostics
 ```{r, cache = TRUE}
+m1 <- glmer(Freq ~ trt + (1|plantLineage) +  (1|accessNum), family = poisson, data = cf1)
+summary(m1)
+
 # diagnostics
 # qq plot
 qqnorm(resid(m1), main = "")
-qqline(resid(m1)) # good, one possible outlier
+qqline(resid(m1)) # outliers
 
 # residual plot
 plot(fitted(m1), resid(m1), xlab = "fitted", ylab = "residuals")
 abline(0,0)
-# possibly one or two outliers
+# possibly outliers
 
 
 # QQPlot for group-level effects
 qqnorm(ranef(m1)$accessNum[[1]], main="Normal Q-Q plot for random effects")
-qqline(ranef(m1)$accessNum[[1]]) # looks good
+qqline(ranef(m1)$accessNum[[1]]) 
+
+# # QQPlot for group-level effects
+qqnorm(ranef(m1)$plantLineage[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(m1)$plantLineage[[1]])
 
 infl <- influence(m1, obs = TRUE) # takes a while to calculate
-plot(infl, which = 'cook') # nothing above 1
+# x11()
+plot(infl, which = 'cook') # some influential points
 
 # visualize model: 
 sjp.lmer(m1, type = 'fe')
@@ -229,7 +280,7 @@ overdisp_fun <- function(model) {
   c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
 }
 
-overdisp_fun(m1) 
+overdisp_fun(m1) # shows overdispersion
 
 # here's another way to check for overdispersion
 residDev <- sum(residuals(m1, type = 'deviance')^2) # calculate residual deviance
@@ -240,8 +291,22 @@ residDev / df.residual(m1)
 
 ## Use negative binomial model, since the poisson model is overdispersed
 ```{r}
-m1.1 <- glmer.nb(Freq ~ trt + (1|accessNum), data = cf1)
+m1.1 <- glmer.nb(Freq ~ trt +(1|plantLineage) +  (1|accessNum), data = cf1)
 summary(m1.1)
+m1.2 <- update(m1.1, .~. - (1|accessNum))
+anova(m1.1, m1.2, test = "LRT")
+summary(m1.2)
+
+
+# m1.1 <- glmer.nb(Freq ~ trt + I(plantLineage == "673_69") +  (1|accessNum), data = cf1)
+# summary(m1.1)
+
+# the model below will not converge
+# m1.1a <- glmer.nb(Freq ~ trt + I(plantLineage == "673_69") + trt: I(plantLineage == "673_69") + (1|accessNum), data = cf1, control=glmerControl(optimizer="bobyqa"))
+# summary(m1.1a)
+
+# m1.1 <- glmer.nb(avgFreq ~ trt +(1|accessNum), data = avgDF)
+# summary(m1.1)
 
 # get overall p-value for treatment
 m2.1 <- update(m1.1, .~. - trt)
@@ -250,43 +315,46 @@ anova(m1.1, m2.1, test = 'LRT')
 
 # Negative binomial model diagnostics
 ```{r, cache = TRUE}
-overdisp_fun(m1.1) 
+overdisp_fun(m1.2) 
 
 # here's another way to check for overdispersion
-residDev <- sum(residuals(m1.1, type = 'deviance')^2) # calculate residual deviance
+residDev <- sum(residuals(m1.2, type = 'deviance')^2) # calculate residual deviance
 # this ratio should be about 1 -- larger than 1 suggests overdispersion
-residDev / df.residual(m1.1) 
+residDev / df.residual(m1.2) 
 
 # diagnostics
 # qq plot
-qqnorm(resid(m1.1), main = "")
-qqline(resid(m1.1)) # good, one possible outlier
+qqnorm(resid(m1.2), main = "")
+qqline(resid(m1.2)) # a little better
 
 # residual plot
-plot(fitted(m1.1), resid(m1.1), xlab = "fitted", ylab = "residuals")
+plot(fitted(m1.2), resid(m1.2), xlab = "fitted", ylab = "residuals")
 abline(0,0) # residuals look better for this model
 
 
 # QQPlot for group-level effects
-qqnorm(ranef(m1.1)$accessNum[[1]], main="Normal Q-Q plot for random effects")
-qqline(ranef(m1.1)$accessNum[[1]]) # looks good
+# qqnorm(ranef(m1.2)$accessNum[[1]], main="Normal Q-Q plot for random effects")
+# qqline(ranef(m1.2)$accessNum[[1]]) 
+
+qqnorm(ranef(m1.2)$plantLineage[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(m1.2)$plantLineage[[1]]) 
 
 infl <- influence(m1.1, obs = TRUE) # takes a while to calculate
 plot(infl, which = 'cook') # nothing above 1
 
 # visualize model: 
-sjp.lmer(m1.1, type = 'fe')
-sjp.lmer(m1.1, type = 're', sort = TRUE) # plot random effects to look for outliers
+sjp.lmer(m1.2, type = 'fe')
+sjp.lmer(m1.2, type = 're', sort = TRUE) # plot random effects to look for outliers
 
 # get estimated dispersion parameter for NB Model
-getME(m1.1, "glmer.nb.theta") # 2.37
+getME(m1.1, "glmer.nb.theta") # 2.17
 
 # post-hoc pairwise comparisons with adjusted p-values
 # from documentation: 
 # test = adjusted() multiple test procedures as specified by the type argument
 # to adjusted: "single-step" denotes adjusted p values as computed
 # from the joint normal or t distribution of the z statistics (default),
-summary(glht(m1.1, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
+summary(glht(m1.2, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
 ```
 
 # Visualize annotated plot for fruit counts
@@ -323,26 +391,40 @@ cf1.1 <- within(cf1, {
 })
 
 # refit model with different reference levels
-m1.1 <- glmer.nb(Freq ~ trt + (1|accessNum), data = cf1.1)
-pframe <- data.frame(trt = levels(droplevels(cf1.1$trt)))
+m1.2 <- glmer.nb(Freq ~ trt + (1|plantLineage) + (1|accessNum), data = cf1.1)
+summary(m1.2)
+
+# may help solve convergence issues-- NOPE!
+pframe <- data.frame(trt = levels(droplevels(cf1.1$trt)), plantLineage = 99999)
 pframe$Freq <- 0
-pp <- predict(m1.1, newdata = pframe, re.form=NA, type = 'response') # re.form sets all random effects to 0
+pp <- predict(m1.2, newdata = pframe, re.form=NA, type = 'response') # re.form sets all random effects to 0
 
 
 ### Calculate CI's (using bootstrap, not accounting for random effects)
-mm <- model.matrix(terms(m1.1), pframe)
-predFun<-function(.) exp(mm%*%fixef(.) )
-bb<-bootMer(m1.1,FUN=predFun,nsim=200) #do this 200 times
-#as we did this 200 times the 95% CI will be bordered by the 5th and 195th value
-bb_se<-apply(bb$t,2,function(x) quantile(x, probs = c(0.025, 0.975)))
-pframe$blo<-bb_se[1,]
-pframe$bhi<-bb_se[2,]
+## I think that sometimes the model doesn't converge, because it estimates variance
+## for random effects to be 0.
+##  according to this: http://rstudio-pubs-static.s3.amazonaws.com/24365_2803ab8299934e888a60e7b16113f619.html
+## you can safely ignore the warnings about convergence
+
+bb2 <- bootMer(m1.2, FUN=function(x) predict(x, pframe, re.form=NA, type = 'response'), nsim = 999)
+bb2_se <-apply(bb2$t,2,function(x) quantile(x, probs = c(0.025, 0.975)))
+pframe$blo<-bb2_se[1,]
+pframe$bhi<-bb2_se[2,]
 pframe$predMean <- pp
 
+
+# This method is the same, but less straightforward.
+# mm <- model.matrix(terms(m1.2), pframe)
+# predFun<-function(.) exp(mm%*%fixef(.) )
+# bb<-bootMer(m1.2,FUN=predFun,nsim=200) #do this 200 times
+# 
+# # as we did this 200 times the 95% CI will be bordered by the 5th and 195th value
+# bb_se<-apply(bb$t,2,function(x) quantile(x, probs = c(0.025, 0.975)))
+# pframe$blo<-bb_se[1,]
+# pframe$bhi<-bb_se[2,]
+# pframe$predMean <- pp
+
 pframe$median = tapply(cf1.1$Freq, INDEX = cf1.1$trt, median)
-
-
-
 pframe$trt <- mapvalues(pframe$trt, from = c("Control", "Bagged", "Bagged & Selfed", 
                                                 "Unbagged & Outcrossed"),
                         to = c("Control", "Bagged", "Bagged\n & Selfed", 
@@ -374,7 +456,7 @@ g1 <- ggplot(pframe, aes(x=trt, y=predMean))+
      theme(axis.text.x = element_text(angle = 45, hjust = 1), 
            legend.position = 'none') +
      # annotate
-     annotate(geom="text", x=c(1,2,3,4), y=c(70, 70, 70, 70) - 30, label=c("a", "b", "a", "c"),
+     annotate(geom="text", x=c(1,2,3,4), y=c(70, 70, 70, 70) - 40, label=c("a", "b", "a", "c"),
                color="black") 
 g1
 ggsave(paste0(saveDir, "KalmiaFruitNumber_BSCI_LinearScale.pdf"), width = 3, height = 4)
@@ -457,10 +539,15 @@ size1 <- droplevels(size1[size1$trt != "Control_2",])
 nrow(size1) # total number of fruits in analysis for size
 data.frame(table(size1$accessNum)) # total number of fruits per plant
 
+data.frame(table(size1$plantLineage)) # total number of fruits per plant lineage
+
 
 size1$trt <- relevel(as.factor(size1$trt), ref = "Control")
-f1 <- lmer(dia_mm ~ trt + (1|accessNum), data = size1)
+f1 <- lmer(dia_mm ~ trt + (1|plantLineage/accessNum), data = size1)
 summary(f1) # final model for paper
+
+f1 <- lmer(dia_mm ~ trt + (1|plantLineage) + (1|accessNum), data = size1)
+summary(f1) # final model for paper (same as above)
 
 # get p-value for trt
 f2 <- update(f1, .~. - trt)
@@ -477,12 +564,17 @@ qqline(resid(f1)) # good
 
 # residual plot
 plot(fitted(f1), residuals(f1, type = "deviance"), xlab = "fitted", ylab = "residuals")
-abline(0,0) # residuals look better for this model
+abline(0,0) 
 
 
 # QQPlot for group-level effects
 qqnorm(ranef(f1)$accessNum[[1]], main="Normal Q-Q plot for random effects")
-qqline(ranef(f1)$accessNum[[1]]) # looks good
+qqline(ranef(f1)$accessNum[[1]]) # one possible outlier
+
+# QQPlot for group-level effects
+qqnorm(ranef(f1)$plantLineage[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(f1)$plantLineage[[1]]) # looks good
+
 
 infl <- influence(f1, obs = TRUE) # takes a while to calculate
 plot(infl, which = 'cook') # nothing above 1
@@ -510,7 +602,7 @@ sf1<- within(size1, {
 })
 
 # refit model with different reference levels
-f1 <- lmer(dia_mm ~ trt + (1|accessNum), data = sf1)
+f1 <- lmer(dia_mm ~ trt + (1|plantLineage) + (1|accessNum), data = sf1)
 pframe <- data.frame(trt = levels(droplevels(sf1$trt)))
 pframe$dia_mm = 0
 pp <- predict(f1, newdata = pframe, re.form=NA, type = 'response') # re.form sets all random effects to 0
@@ -519,7 +611,7 @@ pp <- predict(f1, newdata = pframe, re.form=NA, type = 'response') # re.form set
 ### Calculate CI's (using bootstrap, not accounting for random effects)
 mm <- model.matrix(terms(f1), pframe)
 predFun<-function(.) mm%*%fixef(.)
-bb<-bootMer(f1,FUN=predFun,nsim=200) #do this 200 times
+bb<-bootMer(f1,FUN=predFun,nsim=999) #do this 200 times
 # get quantiles from bootstrap sample
 bb_se<-apply(bb$t,2,function(x) quantile(x, probs = c(0.025, 0.975)))
 pframe$blo<-bb_se[1,]

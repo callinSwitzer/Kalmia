@@ -196,35 +196,8 @@ data.frame(table(interaction(cf1$accessNum , cf1$trt)))
 Account for plant lineage and accession number
 
 ```{r}
-m1 <- glmer(Freq ~ trt + I(plantLineage == "673_69") +  (1|accessNum), family = poisson, data = cf1)
-summary(m1)
-
-factorPreds <- predict(m1)
-length(factorPreds)
-
 m1 <- glmer(Freq ~ trt + (1|plantLineage) +  (1|accessNum), family = poisson, data = cf1)
 summary(m1)
-
-merPreds <- predict(m1)
-plot(factorPreds, merPreds)
-abline(0,1)
-
-m1_1 <- glmer(Freq ~ trt + (1|plantLineage), family = poisson, data = cf1)
-anova(m1, m1_1, test = "LRT") # keep accessNum
-summary(m1)
-
-merPreds <- predict(m1, newdata = avgDF)
-plot(factorPreds, merPreds)
-abline(0,1)
-
-m1 <- glmer(Freq ~ trt + (1|accessNum), family = poisson, data = cf1)
-summary(m1)
-
-nonIndPreds <- predict(m1, newdata = avgDF)
-plot(nonIndPreds, merPreds)
-abline(0,1)
-
-
 
 # calculate LRT for trt
 m2 <- update(m1, .~. - trt)
@@ -293,58 +266,45 @@ residDev / df.residual(m1)
 ```{r}
 m1.1 <- glmer.nb(Freq ~ trt +(1|plantLineage) +  (1|accessNum), data = cf1)
 summary(m1.1)
-m1.2 <- update(m1.1, .~. - (1|accessNum))
-anova(m1.1, m1.2, test = "LRT")
-summary(m1.2)
 
-
-# m1.1 <- glmer.nb(Freq ~ trt + I(plantLineage == "673_69") +  (1|accessNum), data = cf1)
-# summary(m1.1)
-
-# the model below will not converge
-# m1.1a <- glmer.nb(Freq ~ trt + I(plantLineage == "673_69") + trt: I(plantLineage == "673_69") + (1|accessNum), data = cf1, control=glmerControl(optimizer="bobyqa"))
-# summary(m1.1a)
-
-# m1.1 <- glmer.nb(avgFreq ~ trt +(1|accessNum), data = avgDF)
-# summary(m1.1)
 
 # get overall p-value for treatment
 m2.1 <- update(m1.1, .~. - trt)
-anova(m1.1, m2.1, test = 'LRT')
+anova(m1.1, m2.1, test = 'LRT') # LRT for trt for paper
 ```
 
 # Negative binomial model diagnostics
 ```{r, cache = TRUE}
-overdisp_fun(m1.2) 
+overdisp_fun(m1.1) 
 
 # here's another way to check for overdispersion
-residDev <- sum(residuals(m1.2, type = 'deviance')^2) # calculate residual deviance
+residDev <- sum(residuals(m1.1, type = 'deviance')^2) # calculate residual deviance
 # this ratio should be about 1 -- larger than 1 suggests overdispersion
-residDev / df.residual(m1.2) 
+residDev / df.residual(m1.1) 
 
 # diagnostics
 # qq plot
-qqnorm(resid(m1.2), main = "")
-qqline(resid(m1.2)) # a little better
+qqnorm(resid(m1.1), main = "")
+qqline(resid(m1.1)) # a little better
 
 # residual plot
-plot(fitted(m1.2), resid(m1.2), xlab = "fitted", ylab = "residuals")
+plot(fitted(m1.1), resid(m1.1), xlab = "fitted", ylab = "residuals")
 abline(0,0) # residuals look better for this model
 
 
 # QQPlot for group-level effects
-# qqnorm(ranef(m1.2)$accessNum[[1]], main="Normal Q-Q plot for random effects")
-# qqline(ranef(m1.2)$accessNum[[1]]) 
+qqnorm(ranef(m1.1)$accessNum[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(m1.1)$accessNum[[1]])
 
-qqnorm(ranef(m1.2)$plantLineage[[1]], main="Normal Q-Q plot for random effects")
-qqline(ranef(m1.2)$plantLineage[[1]]) 
+qqnorm(ranef(m1.1)$plantLineage[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(m1.1)$plantLineage[[1]]) 
 
 infl <- influence(m1.1, obs = TRUE) # takes a while to calculate
 plot(infl, which = 'cook') # nothing above 1
 
 # visualize model: 
-sjp.lmer(m1.2, type = 'fe')
-sjp.lmer(m1.2, type = 're', sort = TRUE) # plot random effects to look for outliers
+sjp.lmer(m1.1, type = 'fe')
+sjp.lmer(m1.1, type = 're', sort = TRUE) # plot random effects to look for outliers
 
 # get estimated dispersion parameter for NB Model
 getME(m1.1, "glmer.nb.theta") # 2.17
@@ -354,7 +314,7 @@ getME(m1.1, "glmer.nb.theta") # 2.17
 # test = adjusted() multiple test procedures as specified by the type argument
 # to adjusted: "single-step" denotes adjusted p values as computed
 # from the joint normal or t distribution of the z statistics (default),
-summary(glht(m1.2, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
+summary(glht(m1.1, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
 ```
 
 # Visualize annotated plot for fruit counts
@@ -666,6 +626,10 @@ g2 + geom_boxplot(data = sdf1, aes(x = trt, y = meanFrtSz), width = 0.2, alpha =
 ```{r}
 # read in data
 sizeSeed <- read.csv("KalmiaFruitSizeAndSeeds.csv")
+plantInds <- 1:nrow(sizeSeed) %in% grep(pattern = "1129", x = sizeSeed$Plant)
+sizeSeed$plantLineage <- sapply(1:nrow(sizeSeed), FUN = function(x){
+     ifelse(plantInds[x], "673_69", paste(strsplit(as.character(sizeSeed$Plant[x]), split = "_")[[1]][1:2], collapse = "_") )})
+
 
 ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) + 
      geom_point() + 
@@ -682,63 +646,53 @@ ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) +
      scale_y_continuous(trans="log") + 
      labs(y = "log(e) number of seeds")
 
-# GLM 
-ss1 <- glm(NumSeeds ~ Dia..mm., family = poisson, data = sizeSeed)
+# GLMER
+ss1 <- glmer(NumSeeds ~ Dia..mm. + (1|plantLineage), family = poisson, data = sizeSeed)
 summary(ss1)
 
-ss1$deviance / ss1$df.residual # overdispersed
+residDev <- sum(residuals(ss1, type = 'deviance')^2) # calculate residual deviance
+# this ratio should be about 1 -- larger than 1 suggests overdispersion
+residDev / df.residual(ss1) 
 
 
-# Neg Binomial Model 
-ss2 <- glm.nb(NumSeeds ~ Dia..mm., data = sizeSeed)
-summary(ss2) # final model for paper
+overdisp_fun(ss1) #not overdispersed
+
+## model diagnostics 
+plot(ss1) #cook's distance
+
+qqnorm(resid(ss1), main = "")
+qqline(resid(ss1)) # one outlier
 
 
-# get overall test stat for dia
-ss3 <-update(ss2, .~. - Dia..mm.)
-anova(ss2, ss3) # overall p-value for Dia..mm.
+# # QQPlot for group-level effects
+qqnorm(ranef(ss1)$plantLineage[[1]], main="Normal Q-Q plot for random effects")
+qqline(ranef(ss1)$plantLineage[[1]])
 
-## visualize CI's for the two different models
-
-newD <- data.frame(Dia..mm. = seq(2, 6, length.out = 100))
-nbPreds = predict(ss2, newD, type = 'response', se.fit = TRUE)
-nd1 <- data.frame(newD, nppred = nbPreds$fit, npse = nbPreds$se.fit)
-predsPois <- predict(ss1, newD, type = 'response', se.fit = TRUE)
-
-
-n2 <- data.frame(nd1, poisPred = predsPois$fit, poisse = predsPois$se.fit)
-n2$npUpper <- with(n2,  nppred + 2 * npse)
-n2$npLower <- with(n2, nppred - 2 * npse)
-n2$pUpper <- with(n2,  poisPred + 2 * poisse)
-n2$pLower <- with(n2, poisPred - 2 * poisse)
-
-# compare NB errors vs. Pois errors
-ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) + 
-     geom_point() + 
-     geom_line(data = n2, aes(x = Dia..mm., y = poisPred), color = 'blue') + 
-     geom_line(data = n2, aes(x = Dia..mm., y = pUpper), color = 'blue', linetype = 2) + 
-     geom_line(data = n2, aes(x = Dia..mm., y = pLower), color = 'blue', linetype = 2) + 
-     labs(x = 'Fruit Diameter (mm)', y = 'Num Seeds in 1 Carpel') + 
-     geom_line(data = n2, aes(x = Dia..mm., y = nppred), color = 'red') + 
-     geom_line(data = n2, aes(x = Dia..mm., y = npUpper), color = 'red', linetype = 3) + 
-     geom_line(data = n2, aes(x = Dia..mm., y = npLower), color = 'red', linetype = 3)
-
-
-## model diagnostics for negative binomial model
-plot(ss2, which = 4) #cook's distance
-
-
-plot(y = residuals(ss2, type = 'deviance'), x = ss2$fitted.values)
-abline(h = 0)
-
-# should be close to 1
-ss2$deviance / ss2$df.residual
+infl <- influence(ss1, obs = TRUE) # takes a while to calculate
+plot(infl, which = 'cook') # some influential points
 
 # get sample size
 nrow(sizeSeed) # total number of individual fruits
 
 sum(sizeSeed$NumSeeds) # total number of seeds counted
 
+# total plant lineages
+length(unique(sizeSeed$plantLineage))
+
+
+# plot data with line
+preds <- predict(ss1, newdata = data.frame(Dia..mm. = seq(2.5, 5.5, length.out = 100)), re.form = NA, type = 'response')
+
+predDF <- data.frame(Dia..mm. = seq(2.5, 5.5, length.out = 100), preds = preds)
+
+
+# visualize data
+ggplot(sizeSeed, aes(x = Dia..mm., y = NumSeeds)) + 
+     geom_point() + 
+     geom_line(data = predDF, aes(x = Dia..mm., y = preds), color = 'blue') +  
+     labs(x = 'Fruit Diameter (mm)', y = 'Num Seeds in 1 Carpel')
+
+ggsave(paste0(saveDir, "KalmiaFruitDia_NumSeeds.pdf"), width = 3, height = 4)
 ```
 
 

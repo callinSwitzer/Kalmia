@@ -315,6 +315,7 @@ getME(m1.1, "glmer.nb.theta") # 2.17
 # to adjusted: "single-step" denotes adjusted p values as computed
 # from the joint normal or t distribution of the z statistics (default),
 summary(glht(m1.1, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
+summary(glht(m1.1, lsm(pairwise ~ trt)), test=adjusted("none")) # pairwise tests for fruit counts, unadjusted
 ```
 
 # Visualize annotated plot for fruit counts
@@ -551,6 +552,7 @@ sjp.lmer(f1, type = 're', sort = TRUE) # plot random effects to look for outlier
 # to adjusted: "single-step" denotes adjusted p values as computed
 # from the joint normal or t distribution of the z statistics (default),
 summary(glht(f1, lsm(pairwise ~ trt)), test=adjusted("single-step")) # pairwise tests for fruit counts
+summary(glht(f1, lsm(pairwise ~ trt)), test=adjusted("none")) # pairwise tests for fruit counts, unadjusted
 ```
 
 

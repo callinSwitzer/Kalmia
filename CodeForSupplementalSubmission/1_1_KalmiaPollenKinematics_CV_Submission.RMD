@@ -236,6 +236,65 @@ mean(bestSmthPol)#  ~0.26
 ```
 
 
+# make some figures for supplemental files
+
+```{R}
+theme_set(theme_classic())
+
+ggplot(newL, aes(x = smoothingParameter, y = sumOfErrors)) + 
+     geom_point() + 
+     labs(x = "Smoothing Parameter", y = "Average out-of-sample error")
+saveDir <- "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/Media/"
+ggsave(paste0(saveDir, "outOfSampleErrors_Example.pdf"), width = 4, height = 3)
+
+
+plot(newL)
+
+# plot undersmoothed vs. oversmoothed
+xy <- pollen
+colnames(xy) <- c("x", "y", "sampeNum", "time1")
+xy = xy[complete.cases(xy), ]
+xy$sampeNum <- NULL
+xy$trt <- "spar = 0"
+
+spp <- 0.29
+smy_low <- data.frame(predict(smooth.spline(y = xy$y, x = xy$time1, spar = spp)))
+colnames(smy_low) <- c('time1', 'y')
+smx_low <- data.frame(predict(smooth.spline(y = xy$x, x = xy$time1, spar = spp)))
+colnames(smx_low) <- c('time1', 'x')
+
+lowDF <- merge(smx_low, smy_low)
+lowDF$trt <- "spar = 0.29"
+
+
+spp <- 0.5
+smy_high <- data.frame(predict(smooth.spline(y = xy$y, x = xy$time1, spar = spp)))
+colnames(smy_high) <- c('time1', 'y')
+smx_high <- data.frame(predict(smooth.spline(y = xy$x, x = xy$time1, spar = spp)))
+colnames(smx_high) <- c('time1', 'x')
+
+highDF <- merge(smx_high, smy_high)
+highDF$trt <- "spar = 0.5"
+
+longDF <- rbind(xy, lowDF, highDF)
+
+library(viridis)
+
+ggplot(longDF, aes(x = x, y = y, color = trt)) + 
+     geom_path(alpha = 0.5) + 
+     geom_point(aes(shape = trt)) + 
+     xlim(c(270, 280)) +
+     ylim(c(15, 30)) + 
+     labs(x = "X position (pixels)", y = "Y position (pixels)") + 
+     coord_fixed() + 
+     theme(legend.justification = c(1, 0), legend.position = c(1, .5)) + 
+     scale_color_viridis(name = "Smoothing Parameter", discrete = TRUE,end = 0.9) + 
+     scale_shape_discrete(name = "Smoothing Parameter")
+
+ggsave(paste0(saveDir, "SuppFig2_smoothingParameter_Example.pdf"), width = 4, height = 4)
+```
+
+
 # Visualize raw and smoothed data to see how different it is.
 ```{r, cache = TRUE, fig.width=4, fig.height=4}
 spp = 0.29

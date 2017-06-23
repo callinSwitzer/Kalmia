@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## may not need any smoothing
 ## 8 Dec Update: used cross validation for decide smoothing parameter for smoothing spline
 ## 8 Feb 2017 Update: Cleaned up code for submission as supplemental info
+## 22 June 2017 Update: Made example plots for position/speed/accel
 
 
 
@@ -69,6 +70,8 @@ Note: The smoothing parameter was chosen with 10-fold CV
 digdirect <- "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/DatasetsSupplemental/CleanKalmiaDigitized/"
 
 newDF <- data.frame()
+
+
 
 for(ii in 1:nrow(metDat)){
      
@@ -214,6 +217,10 @@ for(ii in 1:nrow(metDat)){
      # align frames
      tmeRoll <- seq(from = -which(antherPoll$polStart) + 1, length.out = length(tme)) / fps
      
+     # update for different visualization
+     # align frames -- center, based on max speed
+     # tmeRoll <- seq(from = -which.max(antherPoll$polspeed) + 1, length.out = length(tme)) / fps
+     
      dfi <- data.frame(anthSpeed, polSpeed, a_T_anth, a_T_Pol, tme, 
                        trial = metDat$VideoName[ii], 
                        tmeStart = antherPoll$polStart,
@@ -240,8 +247,9 @@ ggplot(newDF, aes(x = centeredTime, y = anthSpeed, group = trial)) +
      geom_line(alpha = 0.5) +
      xlim(c(-0.01, 0.02)) + 
      ylim(c(0,6)) + 
-     labs(x = "Time (s)", y = "Anther speed (m/s)")
+     labs(x = "Time (s)", y = "Anther speed (m/s)") + 
 ggsave(paste0(savePath, "antherSpeed01_CVSmoothSpline.pdf"), width = 5, height = 4)
+
 
 
 # pollen speed
@@ -354,6 +362,259 @@ ggsave(paste0(savePath, "pollenTangAccelMax01_CVSmoothSpline.pdf"), width = 5, h
 ```
 
 
+# Make example figure to show position/speed/acceleration
+
+```{r}
+ii = 28
+print(ii)
+ddfile <- paste0(digdirect, metDat$redigitizedFile[ii])
+
+ddfile <- "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/DatasetsSupplemental/CleanKalmiaDigitized/20150608_135726xypts.csv"
+dp <- read.csv(ddfile)
+
+# calibrate locations, based on digitized pin or other object
+# calibration points
+pin <- data.frame(dp$pt1_cam1_X, dp$pt1_cam1_Y, dp$pt2_cam1_X, dp$pt2_cam1_Y)
+pin <- pin[complete.cases(pin), ]
+
+# get the number of pixels in the calibration
+PixInPin <- (sqrt((pin$dp.pt1_cam1_X - pin$dp.pt2_cam1_X)^2 +
+                       (pin$dp.pt1_cam1_Y-pin$dp.pt2_cam1_Y)^2)) / 
+     metDat$CalSizeMM[ii] # to get to mm
+
+
+# get anther and pollen locations
+antherPoll <- data.frame(anthx = dp$pt3_cam1_X, anthy= dp$pt3_cam1_Y, 
+                         polx = dp$pt4_cam1_X, poly= dp$pt4_cam1_Y)
+
+
+
+
+# get frame where pollen starts and leaves
+antherPoll$polStart = 1:nrow(antherPoll) == metDat$framePollenStartedLeaving[ii]
+antherPoll$polEnd = 1:nrow(antherPoll) == metDat$framePollenReleaseComplete[ii]
+
+# gives only rows where either anth and pollen are complete
+antherPoll = antherPoll[ complete.cases(antherPoll[c('anthx')]) | 
+                              complete.cases(antherPoll[c('polx')]), ]
+
+
+
+# if x value starts to right of screen, reverse points,
+# so all x values start on the left part of the screen at 0
+if(lm(antherPoll[,1] ~ I(1:length( antherPoll[,1])))$coefficients[2] < 0 ){
+     antherPoll$anthx <- metDat[ii,'vidWidth'] - antherPoll$anthx
+     antherPoll$polx <- metDat[ii,'vidWidth'] - antherPoll$polx
+}
+
+
+
+plot(antherPoll$polx, antherPoll$poly, asp = 1)
+
+# cbind data frame, to add smoothed columns
+antherPoll <- data.frame(cbind(antherPoll, antherPoll))
+
+# smooth with a smoothing spline, spar = 0.29 -- this smoothing
+# spline was chosen through cross validation
+foo = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(y){
+     yy = na.omit(antherPoll[, y])
+     xx = 1:length(yy)
+     
+     sm1 <- smooth.spline(x = xx, y = yy, spar = 0.29)
+     antherPoll[, y][complete.cases(antherPoll[, y])] <<- sm1$y
+})
+
+plot(antherPoll$anthx.1, antherPoll$anthy.1)
+
+antherPoll <- antherPoll[10:nrow(antherPoll), ]
+
+# add time to data frame
+antherPoll$tme = 0: (nrow(antherPoll) - 1) / fps # time
+
+# add columns with absolute position into dataframe (calculated from smoothed data)
+# calculate position from starting point, not from minimum point
+bar = sapply(X = c("anthx.1", "anthy.1", "polx.1", "poly.1"), FUN = function(x){
+     newName = paste0(x, ".abs")
+     tmp <- antherPoll[,x] / PixInPin / 1000
+     antherPoll[,newName] <<- tmp - na.omit(tmp)[1]
+     #antherPoll[,newName] <<- tmp - min(na.omit(tmp))
+})
+
+plot(antherPoll$anthx.1.abs, antherPoll$anthy.1.abs)
+
+
+# add columns to show velocity, based on smoothed, absolute position
+# velocity is in m/s
+bat = sapply(X = c("anthx.1.abs", "anthy.1.abs", "polx.1.abs", "poly.1.abs"), 
+             FUN = function(x){
+                  newName = paste0(x, ".vel")
+                  tmp <-  c(NaN, diff(antherPoll[,x])) * fps # add a NaN to beginning of data
+                  antherPoll[,newName] <<- tmp 
+             })
+
+# calculate speed
+antherPoll$anthspeed = sqrt(antherPoll$anthx.1.abs.vel^2 + antherPoll$anthy.1.abs.vel^2)
+antherPoll$polspeed = sqrt(antherPoll$polx.1.abs.vel^2 + antherPoll$poly.1.abs.vel^2)
+
+###########################################
+# pollen acceleration
+polVelocity = cbind(antherPoll$polx.1.abs.vel, antherPoll$poly.1.abs.vel)
+polSpeed = antherPoll$polspeed
+# plot(polSpeed)
+tme = antherPoll$tme
+polAccel = data.frame(rbind(c(NA, NA), apply(polVelocity, MARGIN = 2, FUN = diff))) * fps
+
+# calculate unit tangent vector
+T_t = polVelocity / polSpeed
+
+DT = data.frame(rbind(c(NA, NA), apply(T_t, MARGIN = 2, FUN = diff))) * fps
+NormDT = sqrt(DT[,1]^2 + DT[,2]^2)
+Curvature = NormDT / polSpeed
+
+# compute a_N (normal acceleration) and a_T (tangential acceleration)
+# a_T = ds/dt
+a_T =  c(NA, diff(polSpeed) * fps)
+N_t = data.frame(t(sapply(1:nrow(DT), FUN = function(x) unlist(DT[x, ] / NormDT[x]))))
+# plot(a_T, type = "l", ylim = c(-3000, 3000))
+
+# a_N = speed^2 * curvature
+a_N = polSpeed^2 * Curvature
+
+
+# check total accel by adding normal and tangential accelerations
+# a_total = a_T * T_t + a_N * N_t
+a_total = as.data.frame(t(sapply(X = 1:nrow(polAccel), FUN  = function(x) a_T[x] * T_t[x, ] + a_N[x] * N_t[x,] )))
+
+a_T_Pol = a_T
+
+
+
+
+ggplot(antherPoll, aes(y = poly.1.abs, x = polx.1.abs)) + 
+     geom_path(alpha = 0.5)  + 
+     coord_fixed() + 
+     ylim(0, 0.11)+
+     labs(y = "Vertical Position (m)", x = "Horizontal position (m)")
+
+
+
+x1 <- ggplot(antherPoll, aes(x = tme, y = polx.1.abs)) + 
+     geom_line() + 
+     labs(x = "", y = "Pollen\nhorizontal position (m)") + 
+     ylim(-0.01, 0.11)+ 
+     theme(axis.title.y=element_text(margin=margin(0,20,0,0)))+ 
+     theme(plot.margin = unit(c(1,1,-1,0), "cm")) + 
+ggsave(filename = paste0(savePath,"/horizontalpos.png"), width = 5*1.5, height = 1.5*1.5, dpi =200)
+
+x2 <- ggplot(antherPoll, aes(x = tme, y = poly.1.abs)) + 
+     geom_line() + 
+     ylim(-0.01, 0.11)+
+     labs(x = "", y = "Pollen\nvertical Position (m)")+ 
+     theme(axis.title.y=element_text(margin=margin(0,20,0,0)))+ 
+     theme(plot.margin = unit(c(1,1,-1,0), "cm")) + 
+ggsave(filename = paste0(savePath,"/verticalpos.png"), width = 5*1.5, height = 1.5*1.5, dpi =200)
+
+x3 <- ggplot(antherPoll, aes(x = tme, y = polspeed)) + 
+     geom_line() + 
+     labs(x = "", y = "Pollen\nspeed (m/s)")+ 
+     theme(plot.margin = unit(c(1,1,-5,0), "cm")) + 
+     theme(axis.title.y=element_text(margin=margin(0,20,0,0)))
+x3
+ggsave(filename = paste0(savePath,"/speed.png"), width = 5*1.5, height = 1.5*1.5, dpi =200)
+
+x4 <- ggplot(antherPoll, aes(x = tme, y = a_T_Pol)) + 
+     geom_line() + 
+     labs(x = "Time (s)", y = "Pollen\ntangential accel. (m/s/s)") + 
+     theme(axis.title.y=element_text(margin=margin(0,20,0,0)))+ 
+     theme(plot.margin = unit(c(0,0,0,0), "cm")) + 
+ggsave(filename = paste0(savePath,"/pollenAccel.png"), width = 5*1.5, height = 1.5*1.5, dpi =200)
+
+
+#install.packages("cowplot")
+library(cowplot)
+
+
+plot_grid(x1, x2, x3, x4, align='vh', ncol = 1)
+ggsave(paste0(savePath,"fourplots.png"), height = 10, width = 10, dpi = 120)
+
+```
+
+
+# Visualize pollen and anther speed
+
+```{r, cache = TRUE}
+theme_set(theme_classic())
+
+savePath = "/Users/callinswitzer/Dropbox/ExperSummer2016/Kalmia/Manuscript/FigsNotForSubmission/"
+
+# anther speed
+ggplot(newDF, aes(x = centeredTime, y = anthSpeed, group = trial)) + 
+     geom_line(alpha = 0.5) +
+     xlim(c(-0.01, 0.02)) + 
+     ylim(c(0,6)) + 
+     labs(x = "Time (s)", y = "Anther speed (m/s)") + 
+ggsave(paste0(savePath, "antherSpeed01_CVSmoothSpline.pdf"), width = 5, height = 4)
+
+
+# pollen speed
+ggplot(newDF, aes(x = centeredTime, y = polSpeed, group = trial)) + 
+     geom_line(alpha = 0.5) + 
+     xlim(c(-0.01, 0.02)) +
+     ylim(c(0,6)) +  
+     labs(x = "Time (s)", y = "Pollen speed (m/s)")
+ggsave(paste0(savePath, "pollenSpeed01_CVSmoothSpline.pdf"), width = 5, height = 4)
+
+# anther tangential acceleration
+ggplot(newDF, aes(x = centeredTime, y = a_T_anth, group = trial)) + 
+     geom_line(alpha = 0.5) + 
+     #ylim(c(-2500, 4000)) +
+     xlim(c(-0.01, 0.02)) + 
+     labs(x = "Time (s)", y = "Anther tangential acceleration  (m/s/s)")
+ggsave(paste0(savePath, "antherTangAccel01_CVSmoothSpline.pdf"), width = 5, height = 4)
+
+# pollen tangential acceleration
+# anther tangential acceleration
+ggplot(newDF, aes(x = centeredTime, y = a_T_Pol, group = trial)) + 
+     geom_line(alpha = 0.5) + 
+     #ylim(c(-2500, 4000)) +
+     xlim(c(-0.01, 0.02)) + 
+     labs(x = "Time (s)", y = "Pollen tangential acceleration  (m/s/s)")
+ggsave(paste0(savePath, "PollenTangAccel01_CVSmoothSpline.pdf"), width = 5, height = 4)
+```
+
+# Find max for each measurement for each trial and visualize
+```{r, cache = TRUE}
+# anther speed
+mmx <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
+     tmp <- newDF[newDF$trial == x, ]
+     return (unlist(tmp[which.max(tmp$anthSpeed),]))
+})))
+mmx$trial <- row.names(mmx)
+
+
+ggplot() + 
+     geom_line(data = newDF, aes(x = centeredTime, y = anthSpeed, group = as.factor(trial)), alpha = 0.5) +
+     xlim(c(-0.01, 0.02)) + 
+     ylim(c(0,6)) + 
+     labs(x = "Time (s)", y = "Anther speed (m/s)") + 
+     geom_point(data = mmx, aes(x = centeredTime, y = anthSpeed), color = 'red', alpha = 0.5) + 
+     theme(legend.position = "none") 
+#+  facet_wrap(~ trial)
+ggsave(paste0(savePath, "antherSpeedMax01_CVSmoothSpline.pdf"), width = 5, height = 4)
+
+
+# pollen speed
+mmp <- as.data.frame(t(sapply(unique(as.character(newDF$trial)), FUN = function(x){
+     tmp <- newDF[newDF$trial == x, ]
+     tmp <- tmp[abs(tmp$centeredTime) < 0.01, ]
+     return (unlist(tmp[which.max(tmp$polSpeed),]))
+})))
+
+mmp$trial <- row.names(mmp)
+
+
+
+```
 
 
 

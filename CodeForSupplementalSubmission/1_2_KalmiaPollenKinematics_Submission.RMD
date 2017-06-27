@@ -365,7 +365,7 @@ ggsave(paste0(savePath, "pollenTangAccelMax01_CVSmoothSpline.pdf"), width = 5, h
 # Make example figure to show position/speed/acceleration
 
 ```{r}
-ii = 28
+ii = 2
 print(ii)
 ddfile <- paste0(digdirect, metDat$redigitizedFile[ii])
 
@@ -493,7 +493,7 @@ a_T_Pol = a_T
 ggplot(antherPoll, aes(y = poly.1.abs, x = polx.1.abs)) + 
      geom_path(alpha = 0.5)  + 
      coord_fixed() + 
-     ylim(0, 0.11)+
+     ylim(0, 0.011)+
      labs(y = "Vertical Position (m)", x = "Horizontal position (m)")
 
 
@@ -501,14 +501,14 @@ ggplot(antherPoll, aes(y = poly.1.abs, x = polx.1.abs)) +
 x1 <- ggplot(antherPoll, aes(x = tme, y = polx.1.abs)) + 
      geom_line() + 
      labs(x = "", y = "Pollen\nhorizontal position (m)") + 
-     ylim(-0.01, 0.11)+ 
+     ylim(-0.001, 0.011)+ 
      theme(axis.title.y=element_text(margin=margin(0,20,0,0)))+ 
      theme(plot.margin = unit(c(1,1,-1,0), "cm")) + 
 ggsave(filename = paste0(savePath,"/horizontalpos.png"), width = 5*1.5, height = 1.5*1.5, dpi =200)
 
 x2 <- ggplot(antherPoll, aes(x = tme, y = poly.1.abs)) + 
      geom_line() + 
-     ylim(-0.01, 0.11)+
+     ylim(-0.001, 0.011)+
      labs(x = "", y = "Pollen\nvertical Position (m)")+ 
      theme(axis.title.y=element_text(margin=margin(0,20,0,0)))+ 
      theme(plot.margin = unit(c(1,1,-1,0), "cm")) + 
